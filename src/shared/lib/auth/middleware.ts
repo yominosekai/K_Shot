@@ -4,8 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateUser } from '@/features/auth/api/auth';
 import { checkPermission } from '@/features/auth/utils';
 import type { User } from '@/features/auth/types';
-import { getAuthCache, setAuthCache } from './session-cache';
+import { getAuthCache, setAuthCache, clearAuthCache } from './session-cache';
 import { debug, error } from '../logger';
+import { getUserData } from '@/shared/lib/data-access/users';
 
 const MODULE_NAME = 'auth-middleware';
 
@@ -154,18 +155,33 @@ export async function requireRole(
     return authResult;
   }
 
-  if (!hasPermission(authResult.user, permission)) {
-    error(MODULE_NAME, `requireRole: 権限不足: sid=${authResult.user.sid}, required=${permission}, actual=${authResult.user.role}`);
+  const initialUser = authResult.user;
+
+  if (hasPermission(initialUser, permission)) {
+    return authResult;
+  }
+
+  const refreshedUser = await refreshAuthUser(initialUser.sid ?? initialUser.id);
+
+  if (refreshedUser && hasPermission(refreshedUser, permission)) {
     return {
-      success: false,
-      response: NextResponse.json(
-        { success: false, error: '権限が不足しています' },
-        { status: 403 }
-      ),
+      success: true,
+      user: refreshedUser,
     };
   }
 
-  return authResult;
+  const actualRole = refreshedUser?.role ?? initialUser.role;
+  error(
+    MODULE_NAME,
+    `requireRole: 権限不足: sid=${initialUser.sid}, required=${permission}, actual=${actualRole}`
+  );
+  return {
+    success: false,
+    response: NextResponse.json(
+      { success: false, error: '権限が不足しています' },
+      { status: 403 }
+    ),
+  };
 }
 
 /**
@@ -213,6 +229,25 @@ export async function requireOwnerOrAdmin(
       { status: 403 }
     ),
   };
+}
+
+async function refreshAuthUser(sid?: string): Promise<User | null> {
+  if (!sid) {
+    return null;
+  }
+
+  try {
+    const user = await getUserData(sid);
+    if (user) {
+      setAuthCache(sid, user);
+      return user;
+    }
+    clearAuthCache(sid);
+    return null;
+  } catch (err) {
+    error(MODULE_NAME, `refreshAuthUserエラー: sid=${sid}`, err);
+    return null;
+  }
 }
 
 
