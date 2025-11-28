@@ -89,7 +89,8 @@ const getTextFromNode = (children: ReactNode): string =>
       if (typeof child === 'string') return child;
       if (typeof child === 'number') return String(child);
       if (isValidElement(child)) {
-        return getTextFromNode(child.props.children);
+        const props = child.props as { children?: ReactNode };
+        return getTextFromNode(props.children);
       }
       return '';
     })
@@ -156,11 +157,14 @@ const highlightNode = (node: ReactNode, query?: string, registerHit?: RegisterHi
     return node.map((child, index) => <Fragment key={index}>{highlightNode(child, query, registerHit, docId)}</Fragment>);
   }
 
-  if (isValidElement(node) && node.props?.children) {
-    return cloneElement(node, {
-      ...node.props,
-      children: highlightNode(node.props.children, query, registerHit, docId),
-    });
+  if (isValidElement(node)) {
+    const props = node.props as { children?: ReactNode } & Record<string, unknown>;
+    if (props.children) {
+      return cloneElement(node, {
+        ...props,
+        children: highlightNode(props.children, query, registerHit, docId),
+      } as any);
+    }
   }
 
   return node;
@@ -180,15 +184,18 @@ const createMarkdownComponents = (searchQuery?: string, docId?: string, globalHi
   };
   const applyHighlight = (node: ReactNode) => highlightNode(node, searchQuery, registerHit, docId);
 
-  const MarkdownImage = ({ src, alt }: { src?: string; alt?: string }) => (
-    <figure className="my-8 overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md bg-white dark:bg-slate-800">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} className="w-full h-auto" loading="lazy" />
-      {alt ? <figcaption className="text-sm text-gray-500 dark:text-gray-400 px-4 py-2">{alt}</figcaption> : null}
-    </figure>
-  );
+  const MarkdownImage = ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
+    const srcString = typeof src === 'string' ? src : undefined;
+    return (
+      <figure className="my-8 overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md bg-white dark:bg-slate-800">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={srcString} alt={alt} className="w-full h-auto" loading="lazy" {...props} />
+        {alt ? <figcaption className="text-sm text-gray-500 dark:text-gray-400 px-4 py-2">{alt}</figcaption> : null}
+      </figure>
+    );
+  };
 
-  const Paragraph = ({ children }: { children: ReactNode }) => {
+  const Paragraph = ({ children }: { children?: ReactNode }) => {
     const elements = Children.toArray(children);
     if (elements.length === 1 && isValidElement(elements[0]) && elements[0].type === MarkdownImage) {
       return <>{elements[0]}</>;
@@ -197,10 +204,10 @@ const createMarkdownComponents = (searchQuery?: string, docId?: string, globalHi
   };
 
   return {
-    h1: ({ children }: { children: ReactNode }) => (
+    h1: ({ children }: { children?: ReactNode }) => (
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">{children}</h1>
     ),
-    h2: ({ children }: { children: ReactNode }) => {
+    h2: ({ children }: { children?: ReactNode }) => {
       const text = getTextFromNode(children);
       const id = slugger.slug(text);
       return (
@@ -212,7 +219,7 @@ const createMarkdownComponents = (searchQuery?: string, docId?: string, globalHi
         </h2>
       );
     },
-    h3: ({ children }: { children: ReactNode }) => {
+    h3: ({ children }: { children?: ReactNode }) => {
       const text = getTextFromNode(children);
       const id = slugger.slug(text);
       return (
@@ -221,7 +228,7 @@ const createMarkdownComponents = (searchQuery?: string, docId?: string, globalHi
         </h3>
       );
     },
-    h4: ({ children }: { children: ReactNode }) => {
+    h4: ({ children }: { children?: ReactNode }) => {
       const text = getTextFromNode(children);
       const id = slugger.slug(text);
       return (
@@ -231,46 +238,46 @@ const createMarkdownComponents = (searchQuery?: string, docId?: string, globalHi
       );
     },
     p: Paragraph,
-    ul: ({ children }: { children: ReactNode }) => (
+    ul: ({ children }: { children?: ReactNode }) => (
       <ul className="list-disc pl-6 space-y-2 text-gray-700 dark:text-gray-300 mb-5">{applyHighlight(children)}</ul>
     ),
-    ol: ({ children }: { children: ReactNode }) => (
+    ol: ({ children }: { children?: ReactNode }) => (
       <ol className="list-decimal pl-6 space-y-2 text-gray-700 dark:text-gray-300 mb-5">{applyHighlight(children)}</ol>
     ),
-    li: ({ children }: { children: ReactNode }) => (
+    li: ({ children }: { children?: ReactNode }) => (
       <li className="leading-relaxed">{applyHighlight(children)}</li>
     ),
     img: MarkdownImage,
-    blockquote: ({ children }: { children: ReactNode }) => (
+    blockquote: ({ children }: { children?: ReactNode }) => (
       <blockquote className="border-l-4 border-indigo-400 bg-indigo-50/60 dark:bg-indigo-900/30 px-6 py-4 rounded-r-xl text-gray-700 dark:text-gray-200 italic mb-6">
         {applyHighlight(children)}
       </blockquote>
     ),
     hr: () => <hr className="my-12 border-dashed border-gray-200 dark:border-gray-700" />,
-    table: ({ children }: { children: ReactNode }) => (
+    table: ({ children }: { children?: ReactNode }) => (
       <div className="my-8 overflow-x-auto">
         <table className="w-full border-collapse border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 shadow-sm rounded-lg">
           {applyHighlight(children)}
         </table>
       </div>
     ),
-    thead: ({ children }: { children: ReactNode }) => (
+    thead: ({ children }: { children?: ReactNode }) => (
       <thead className="bg-gray-50 dark:bg-slate-700">{applyHighlight(children)}</thead>
     ),
-    tbody: ({ children }: { children: ReactNode }) => (
+    tbody: ({ children }: { children?: ReactNode }) => (
       <tbody>{applyHighlight(children)}</tbody>
     ),
-    tr: ({ children }: { children: ReactNode }) => (
+    tr: ({ children }: { children?: ReactNode }) => (
       <tr className="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
         {applyHighlight(children)}
       </tr>
     ),
-    th: ({ children }: { children: ReactNode }) => (
+    th: ({ children }: { children?: ReactNode }) => (
       <th className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-left font-semibold text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-slate-700">
         {applyHighlight(children)}
       </th>
     ),
-    td: ({ children }: { children: ReactNode }) => {
+    td: ({ children }: { children?: ReactNode }) => {
       // <br>タグを改行に変換する処理
       const processBrTags = (node: ReactNode): ReactNode => {
         if (typeof node === 'string') {
@@ -295,11 +302,14 @@ const createMarkdownComponents = (searchQuery?: string, docId?: string, globalHi
             <Fragment key={index}>{processBrTags(child)}</Fragment>
           ));
         }
-        if (isValidElement(node) && node.props?.children) {
-          return cloneElement(node, {
-            ...node.props,
-            children: processBrTags(node.props.children),
-          });
+        if (isValidElement(node)) {
+          const props = node.props as { children?: ReactNode } & Record<string, unknown>;
+          if (props.children) {
+            return cloneElement(node, {
+              ...props,
+              children: processBrTags(props.children),
+            } as any);
+          }
         }
         return node;
       };

@@ -1,5 +1,5 @@
 {
-  "name": "学習管理システム",
+  "name": "ナレッジ管理ツール（K_Shot）",
   "version": "0.9.0",
   "private": true,
   "description": "ファイルサーバーに設置したDBファイル設置型",

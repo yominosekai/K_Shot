@@ -35,7 +35,7 @@ export async function GET() {
       success: true,
       info: {
         version: packageJson.version || '0.9.0',
-        name: packageJson.name || '学習管理システム',
+        name: packageJson.name || 'ナレッジ管理ツール（K_Shot）',
         description: packageJson.description || '',
         coreStack,
         changelog,

@@ -75,10 +75,10 @@ export default function VersionPage() {
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {versionInfo?.name || '学習管理システム'}
+                  {versionInfo?.name || 'ナレッジ管理ツール（K_Shot）'}
                 </h2>
                 <p className="text-gray-600 dark:text-gray-400">
-                  {versionInfo?.description || '学習管理システムの新規開発版'}
+                  {versionInfo?.description || 'ナレッジ管理ツール（K_Shot）の新規開発版'}
                 </p>
               </div>
             </div>

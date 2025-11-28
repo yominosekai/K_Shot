@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       const targetPath = `${driveLetter}:\\k_shot`;
       console.log(`[Mount] フォルダ存在確認: ${targetPath}`);
 
-      // 学習管理システムのフォルダが存在するか確認
+      // ナレッジ管理ツール（K_Shot）のフォルダが存在するか確認
       const folderExists = fs.existsSync(targetPath);
       console.log(`[Mount] フォルダ存在: ${folderExists}`);
       

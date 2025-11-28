@@ -35,11 +35,18 @@ mkdir "%APP_FOLDER%" 2>nul
 
 echo Folder structure created
 echo.
+echo Preparing production dependencies (excluding devDependencies)...
+echo.
+
+REM Create production node_modules using PowerShell
+powershell -ExecutionPolicy Bypass -Command "& { $tempProdModules = Join-Path $env:TEMP \"k-shot-prod-modules-$((Get-Random))\"; try { New-Item -ItemType Directory -Path $tempProdModules -Force | Out-Null; Copy-Item -Path 'package.json' -Destination (Join-Path $tempProdModules 'package.json') -Force; if (Test-Path 'package-lock.json') { Copy-Item -Path 'package-lock.json' -Destination (Join-Path $tempProdModules 'package-lock.json') -Force }; Push-Location $tempProdModules; npm install --production --silent 2>&1 | Out-Null; Pop-Location; if (Test-Path (Join-Path $tempProdModules 'node_modules')) { Write-Host 'Production dependencies prepared successfully' -ForegroundColor Green; $env:PROD_MODULES_PATH = $tempProdModules } else { Write-Host 'Failed to create production dependencies, using dev node_modules' -ForegroundColor Yellow; $env:PROD_MODULES_PATH = $null } } catch { Write-Host 'Failed to create production dependencies: ' $_.Exception.Message -ForegroundColor Yellow; $env:PROD_MODULES_PATH = $null } }"
+
+echo.
 echo Copying files...
 
 REM Copy files and folders using PowerShell for better reliability
+powershell -ExecutionPolicy Bypass -Command "& { $prodModulesPath = $env:PROD_MODULES_PATH; if ($prodModulesPath -and (Test-Path (Join-Path $prodModulesPath 'node_modules'))) { $nodeModulesSource = Join-Path $prodModulesPath 'node_modules'; Write-Host 'Using production node_modules (devDependencies excluded)' -ForegroundColor Green; Copy-Item -Path $nodeModulesSource -Destination '%APP_FOLDER%\node_modules' -Recurse -Force } else { Write-Host 'Using development node_modules' -ForegroundColor Yellow; Copy-Item -Path 'node_modules' -Destination '%APP_FOLDER%\node_modules' -Recurse -Force -ErrorAction SilentlyContinue } }"
 powershell -ExecutionPolicy Bypass -Command "& { Copy-Item -Path '.next' -Destination '%APP_FOLDER%\.next' -Recurse -Force -ErrorAction SilentlyContinue }"
-powershell -ExecutionPolicy Bypass -Command "& { Copy-Item -Path 'node_modules' -Destination '%APP_FOLDER%\node_modules' -Recurse -Force -ErrorAction SilentlyContinue }"
 powershell -ExecutionPolicy Bypass -Command "& { Copy-Item -Path 'src' -Destination '%APP_FOLDER%\src' -Recurse -Force -ErrorAction SilentlyContinue }"
 powershell -ExecutionPolicy Bypass -Command "& { Copy-Item -Path 'public' -Destination '%APP_FOLDER%\public' -Recurse -Force -ErrorAction SilentlyContinue }"
 
@@ -53,6 +60,11 @@ copy /Y "next-env.d.ts" "%APP_FOLDER%\" >nul
 
 echo File copy completed
 echo.
+
+REM Clean up temporary production modules folder
+if not "%PROD_MODULES_PATH%"=="" (
+    powershell -ExecutionPolicy Bypass -Command "& { if (Test-Path '%PROD_MODULES_PATH%') { Remove-Item -Path '%PROD_MODULES_PATH%' -Recurse -Force -ErrorAction SilentlyContinue } }"
+)
 
 REM Download and include Node.js (same version as current system)
 set NODE_FOLDER=%DIST_FOLDER%\node

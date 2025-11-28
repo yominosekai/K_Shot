@@ -3,12 +3,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { saveDriveConfig } from '@/shared/lib/utils/drive-config';
 import { SUB_FOLDER } from '@/config/drive';
-import { readDeviceToken } from '@/shared/lib/auth/device-token';
+import {
+  readDeviceToken,
+  verifyTokenSignature,
+  writeDeviceToken,
+  signToken,
+} from '@/shared/lib/auth/device-token';
+import type { DeviceTokenFile } from '@/shared/lib/auth/device-token';
+import { isDeviceSetupCompleted, markDeviceSetupCompleted } from '@/shared/lib/auth/device-setup';
 import fs from 'fs';
 import path from 'path';
-import { fetch as nextFetch } from 'next/dist/compiled/@edge-runtime/primitives/fetch';
-
-const MODULE_NAME = 'api/setup/save';
+import { randomUUID } from 'crypto';
+import type Database from 'better-sqlite3';
 
 /**
  * POST /api/setup/save
@@ -83,56 +89,91 @@ export async function POST(request: NextRequest) {
       setupCompleted: true,
     });
 
-    // 証明ファイルがインポートされているか確認
+    const deviceSetupCompleted = isDeviceSetupCompleted();
     const deviceToken = readDeviceToken();
-    
-    if (deviceToken) {
-      // 証明ファイルが存在する場合、新規ユーザー作成をスキップ
-      // 既存ユーザーとして利用可能
-      console.log('[Save] 証明ファイルが検出されました。新規ユーザー作成をスキップします。');
-    } else {
-      // 証明ファイルが存在しない場合、初回セットアップ（DBにユーザーが0人）の場合のみ自動ブートストラップを実行
-      const { getDatabase } = await import('@/shared/lib/database/db');
-      const db = getDatabase();
-      const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-      
-      if (userCount.count === 0) {
-        // 初回セットアップ（DBにユーザーが0人）の場合のみ、自動ブートストラップを実行
-        const bootstrapUrl = new URL('/api/setup/bootstrap-user', request.url);
-        const bootstrapResponse = await nextFetch(bootstrapUrl.toString(), {
-          method: 'POST',
-        });
+    const hasDeviceToken = !!deviceToken;
 
-        if (!bootstrapResponse.ok) {
-          const errorBody = await bootstrapResponse.json().catch(() => ({}));
-          return NextResponse.json(
-            {
-              success: false,
-              error: errorBody.error || '初期ユーザーの作成に失敗しました',
-            },
-            { status: 500 }
-          );
-        }
+    const { getDatabase } = await import('@/shared/lib/database/db');
+    const db = getDatabase();
+    const { count: totalUsers } = db
+      .prepare('SELECT COUNT(*) as count FROM users')
+      .get() as { count: number };
 
-        // 端末の初期設定完了フラグを保存
-        const { markDeviceSetupCompleted } = await import('@/shared/lib/auth/device-setup');
-        await markDeviceSetupCompleted();
-      } else {
-        // DBにユーザーが存在する場合（トークンファイル紛失など）、自動発行しない
-        // 管理者に問い合わせが必要
-        console.log('[Save] 証明ファイルが存在しませんが、DBにユーザーが存在するため、新規ユーザー作成をスキップします。管理者に問い合わせてください。');
-      }
+    const tokenInspection = inspectDeviceToken(db, deviceToken);
+
+    if (deviceSetupCompleted && !hasDeviceToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'この端末では初期設定が完了していますが、トークンファイルが見つかりません。管理者に問い合わせて再発行してください。',
+          reason: 'TOKEN_MISSING_AFTER_SETUP',
+        },
+        { status: 409 }
+      );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: '設定を保存しました',
-      config: {
-        networkPath,
-        driveLetter,
-        fullPath,
+    if (hasDeviceToken && (!tokenInspection.valid || !tokenInspection.userExists)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            '保存されているトークンが無効、またはユーザー情報と照合できません。管理者に問い合わせて再発行してください。',
+          reason: 'INVALID_TOKEN_STATE',
+        },
+        { status: 409 }
+      );
+    }
+
+    if (hasDeviceToken && tokenInspection.valid && tokenInspection.userExists) {
+      if (!deviceSetupCompleted) {
+        await markDeviceSetupCompleted();
+        console.log('[Save] 端末フラグが未設定だったため、既存トークンを再利用して完了しました。');
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: '設定を保存しました（既存トークンを利用します）',
+        config: {
+          networkPath,
+          driveLetter,
+          fullPath,
+        },
+        provisioning: {
+          action: 'REUSE_EXISTING_TOKEN',
+          userSid: deviceToken!.user_sid,
+        },
+      });
+    }
+
+    if (!hasDeviceToken && !deviceSetupCompleted) {
+      const provisioningAction = totalUsers === 0 ? 'INITIAL_BOOTSTRAP' : 'NEW_DEVICE_USER';
+      const provisionResult = await provisionUserAndToken(db, provisioningAction);
+      await markDeviceSetupCompleted();
+
+      return NextResponse.json({
+        success: true,
+        message: '設定を保存しました。新しいユーザーとトークンを発行しました。',
+        config: {
+          networkPath,
+          driveLetter,
+          fullPath,
+        },
+        provisioning: {
+          action: provisioningAction,
+          userSid: provisionResult.userSid,
+        },
+      });
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: '端末状態の判定に失敗しました。管理者にお問い合わせください。',
+        reason: 'UNHANDLED_STATE',
       },
-    });
+      { status: 409 }
+    );
   } catch (err) {
     console.error('[API] /api/setup/save POST エラー:', err);
     return NextResponse.json(
@@ -140,5 +181,111 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function inspectDeviceToken(
+  db: Database.Database,
+  token: DeviceTokenFile | null
+): { valid: boolean; userExists: boolean } {
+  if (!token) {
+    return { valid: false, userExists: false };
+  }
+
+  try {
+    if (!verifyTokenSignature(token)) {
+      return { valid: false, userExists: false };
+    }
+
+    const tokenRecord = db
+      .prepare('SELECT user_sid, status FROM device_tokens WHERE token = ?')
+      .get(token.token) as { user_sid: string; status: string } | undefined;
+
+    if (!tokenRecord || tokenRecord.status !== 'active') {
+      return { valid: false, userExists: false };
+    }
+
+    const userRecord = db
+      .prepare('SELECT sid FROM users WHERE sid = ?')
+      .get(tokenRecord.user_sid) as { sid: string } | undefined;
+
+    return { valid: true, userExists: !!userRecord };
+  } catch (error) {
+    console.error('[Save] トークン検証中にエラーが発生しました:', error);
+    return { valid: false, userExists: false };
+  }
+}
+
+async function provisionUserAndToken(
+  db: Database.Database,
+  action: 'INITIAL_BOOTSTRAP' | 'NEW_DEVICE_USER'
+): Promise<{ userSid: string; deviceTokenFile: DeviceTokenFile }> {
+  const userSid = randomUUID();
+  const username =
+    action === 'INITIAL_BOOTSTRAP'
+      ? `admin_${userSid.slice(0, 8)}`
+      : `user_${userSid.slice(0, 8)}`;
+  const displayName =
+    action === 'INITIAL_BOOTSTRAP' ? `Admin ${userSid.slice(0, 6)}` : `User ${userSid.slice(0, 6)}`;
+  const email = `${username}@local`;
+  const now = new Date().toISOString();
+  const deviceLabel = `device-${randomUUID().slice(0, 6)}`;
+
+  db.prepare(
+    `
+      INSERT INTO users (
+        sid,
+        username,
+        display_name,
+        email,
+        role,
+        is_active,
+        created_date,
+        last_login
+      )
+      VALUES (?, ?, ?, ?, 'user', 1, ?, ?)
+    `
+  ).run(userSid, username, displayName, email, now, now);
+
+  const tokenValue = randomUUID();
+  const signature = signToken({
+    token: tokenValue,
+    userSid,
+    issuedAt: now,
+    deviceLabel,
+  });
+
+  db.prepare(
+    `
+      INSERT INTO device_tokens (
+        token,
+        user_sid,
+        signature,
+        device_label,
+        issued_at,
+        last_used,
+        status,
+        signature_version
+      ) VALUES (?, ?, ?, ?, ?, ?, 'active', 1)
+    `
+  ).run(tokenValue, userSid, signature, deviceLabel, now, now);
+
+  const deviceTokenFile: DeviceTokenFile = {
+    schema_version: '1.0.0',
+    token: tokenValue,
+    signature,
+    user_sid: userSid,
+    issued_at: now,
+    device_label: deviceLabel,
+    signature_version: 1,
+  };
+
+  await writeDeviceToken(deviceTokenFile);
+
+  console.log('[Save] 新しいユーザーとトークンを発行しました:', {
+    userSid,
+    action,
+  });
+
+  return { userSid, deviceTokenFile };
 }
 

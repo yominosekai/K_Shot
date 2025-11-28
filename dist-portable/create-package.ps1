@@ -43,13 +43,40 @@ if (-not (Test-Path ".next")) {
     exit 1
 }
 
+# 本番用のnode_modulesを作成（devDependenciesを除外）
+Write-Host "📦 本番用の依存関係を準備中..." -ForegroundColor Cyan
+$tempProdModules = Join-Path $env:TEMP "k-shot-prod-modules-$(Get-Random)"
+try {
+    # 一時フォルダに本番用のnode_modulesを作成
+    New-Item -ItemType Directory -Path $tempProdModules -Force | Out-Null
+    Copy-Item -Path "package.json" -Destination (Join-Path $tempProdModules "package.json") -Force
+    Copy-Item -Path "package-lock.json" -Destination (Join-Path $tempProdModules "package-lock.json") -Force -ErrorAction SilentlyContinue
+    
+    # 本番用の依存関係のみをインストール
+    Push-Location $tempProdModules
+    Write-Host "   npm install --production を実行中..." -ForegroundColor Gray
+    npm install --production --silent 2>&1 | Out-Null
+    Pop-Location
+    
+    if (Test-Path (Join-Path $tempProdModules "node_modules")) {
+        Write-Host "✅ 本番用の依存関係を準備しました" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️  本番用の依存関係の作成に失敗しました。開発用のnode_modulesを使用します" -ForegroundColor Yellow
+        $tempProdModules = $null
+    }
+} catch {
+    Write-Host "⚠️  本番用の依存関係の作成に失敗しました: $($_.Exception.Message)" -ForegroundColor Yellow
+    Write-Host "   開発用のnode_modulesを使用します" -ForegroundColor Yellow
+    $tempProdModules = $null
+}
+
 # コピーするファイルとフォルダ
 # 注意: クローズド環境で即動くポータブル版を作成するため、
-#       すべての依存関係（node_modules全体）を含めます
-#       （配布先でnpm installが実行できないため）
+#       本番用の依存関係（dependenciesのみ）を含めます
+#       devDependencies（vitestなど）は除外されます
 $itemsToCopy = @(
     ".next",              # ビルド成果物（必須）- npm run buildで生成
-    "node_modules",       # 依存関係（必須）- 開発依存関係も含む（実行時に必要）
+    "node_modules",       # 依存関係（必須）- 本番用のみ（devDependencies除外）
     "public",             # 静的ファイル（必須）- ロゴ、マニュアルなど
     "package.json",       # 依存関係の定義（必須）
     "package-lock.json",  # 依存関係のロックファイル（推奨）
@@ -59,11 +86,19 @@ $itemsToCopy = @(
 Write-Host "📋 ファイルをコピー中..." -ForegroundColor Cyan
 
 foreach ($item in $itemsToCopy) {
-    $sourcePath = Join-Path $projectRoot $item
+    # node_modulesの場合は本番用のものを使用
+    if ($item -eq "node_modules" -and $tempProdModules -ne $null) {
+        $sourcePath = Join-Path $tempProdModules $item
+    } else {
+        $sourcePath = Join-Path $projectRoot $item
+    }
     $destPath = Join-Path $appFolder $item
     
     if (Test-Path $sourcePath) {
         Write-Host "  → $item" -ForegroundColor Gray
+        if ($item -eq "node_modules" -and $tempProdModules -ne $null) {
+            Write-Host "    （本番用 - devDependencies除外）" -ForegroundColor DarkGray
+        }
         if (Test-Path $sourcePath -PathType Container) {
             # フォルダの場合
             if ($item -eq ".next") {
@@ -91,6 +126,12 @@ foreach ($item in $itemsToCopy) {
     }
 }
 
+# 一時フォルダをクリーンアップ
+if ($tempProdModules -ne $null -and (Test-Path $tempProdModules)) {
+    Write-Host "🧹 一時ファイルをクリーンアップ中..." -ForegroundColor Gray
+    Remove-Item -Path $tempProdModules -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host "✅ ファイルのコピーが完了しました" -ForegroundColor Green
 
 # 起動スクリプトをコピー
@@ -98,7 +139,7 @@ $startBat = @"
 @echo off
 echo off
 chcp 65001 >nul 2>&1
-title 学習管理システム - サーバー起動
+title ナレッジ管理ツール（K_Shot） - サーバー起動
 cd /d "%~dp0" >nul 2>&1
 
 if not exist "node\node.exe" (
@@ -125,7 +166,7 @@ if "%LOG_LEVEL%"=="" set LOG_LEVEL=ERROR
 
 echo.
 echo ========================================
-echo   学習管理システム - サーバー起動
+echo   ナレッジ管理ツール（K_Shot） - サーバー起動
 echo ========================================
 echo   ポート: %PORT%
 echo   URL: http://localhost:%PORT%
@@ -146,7 +187,7 @@ Write-Host "✅ 起動スクリプトを作成しました" -ForegroundColor Gre
 # READMEを作成
 $readme = @"
 ========================================
-学習管理システム - ポータブル版
+ナレッジ管理ツール（K_Shot） - ポータブル版
 ========================================
 
 【セットアップ手順】
@@ -194,7 +235,9 @@ $readme = @"
 - このパッケージには、ビルド済みのアプリケーションが含まれています
 - 開発用のファイル（.git, src/ の一部など）は含まれていません
 - データはネットワークドライブに保存されます（初回起動時に設定）
-- node_modules フォルダは約200MB程度のサイズになります
+- node_modules フォルダには本番用の依存関係のみが含まれます（devDependenciesは除外）
+  - テストツール（vitestなど）や開発ツールは配布物に含まれません
+  - 配布物のサイズが最適化されています
 
 【トラブルシューティング】
 

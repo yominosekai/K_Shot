@@ -1,18 +1,17 @@
-﻿@echo off
-echo off
+@echo off
 chcp 65001 >nul 2>&1
-title 学習管理システム - サーバー起動
+title Knowledge Management Tool (K_Shot) - Server Startup
 cd /d "%~dp0" >nul 2>&1
 
 if not exist "node\node.exe" (
     echo.
-    echo ❌ エラー: node.exe が見つかりません
-    echo    探しているパス: %CD%\node\node.exe
+    echo ERROR: node.exe was not found.
+    echo Expected path: %CD%\node\node.exe
     echo.
-    echo ポータブルNode.jsを以下の手順でセットアップしてください:
-    echo 1. https://nodejs.org/ からNode.jsをダウンロード
-    echo 2. 7-Zipなどで展開
-    echo 3. 展開したフォルダ内のファイルを、このフォルダの "node" フォルダにコピー
+    echo Please place the portable Node.js files into the "node" folder:
+    echo 1. Download Node.js from https://nodejs.org/
+    echo 2. Extract the ZIP archive
+    echo 3. Copy the extracted files into "%~dp0node"
     echo.
     pause
     exit /b 1
@@ -25,11 +24,12 @@ if "%PORT%"=="" set PORT=3005
 
 echo.
 echo ========================================
-echo   学習管理システム - サーバー起動
+echo   Knowledge Management Tool (K_Shot)
+echo   Portable Server Startup
 echo ========================================
-echo   ポート: %PORT%
-echo   URL: http://localhost:%PORT%
-echo   停止: Ctrl+C
+echo   Port : %PORT%
+echo   URL  : http://localhost:%PORT%
+echo   Stop : Ctrl+C
 echo ========================================
 echo.
 

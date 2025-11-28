@@ -83,6 +83,12 @@ export default function SetupPage() {
               setTimeout(() => {
                 setShowTokenWarningModal(true);
               }, 300);
+            } else if (!data.deviceSetupCompleted && data.tokenStatus?.exists && data.tokenStatus?.validInDb) {
+              // トークンは有効だが端末フラグが未設定
+              setTokenWarningMessage('この端末には有効なトークンが保存されています。初期設定を完了すると通常どおり利用できます。');
+              setTimeout(() => {
+                setShowTokenWarningModal(true);
+              }, 300);
             }
           }
         }
