@@ -1,0 +1,19 @@
+# File Server Start Script
+# Ensures the file-server directory exists (no mounting)
+
+$serverPath = Join-Path $PSScriptRoot "file-server"
+
+Write-Host "Checking file server directory..." -ForegroundColor Green
+
+# Check if directory exists
+if (-not (Test-Path $serverPath)) {
+    New-Item -ItemType Directory -Path $serverPath -Force | Out-Null
+    Write-Host "Directory created: $serverPath" -ForegroundColor Green
+} else {
+    Write-Host "Directory already exists: $serverPath" -ForegroundColor Yellow
+}
+
+Write-Host "`nFile server directory is ready." -ForegroundColor Green
+Write-Host "Server path: $serverPath" -ForegroundColor Cyan
+Write-Host "`nNote: Use /setup page in the application to mount this directory as a network drive." -ForegroundColor Yellow
+

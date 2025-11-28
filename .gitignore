@@ -1,0 +1,113 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+
+# ポート履歴
+port_history.txt
+
+# 不要なサブディレクトリ
+new-learning-management-system/
+
+# ローカル専用マイグレーション（GitHubには含めない）
+src/shared/lib/database/migrations-local/
+
+# 配布用パッケージ（appとnodeフォルダのみ除外）
+dist-portable/app/
+dist-portable/node/
+dist-portable.zip
+
+# ローカルファイルサーバー（GitHubには含めない）
+test-file-server/file-server/
+
+# ローカルデータ（GitHubには含めない）
+data/
+# 例外: MoC用のモックデータ（今回のみプッシュ）
+!src/app/moc/data/mockData.ts
+
+# サンプルディレクトリ（GitHubには含めない）
+sample/
+
+# ゴミ箱（GitHubには含めない）
+trashbox/
+
+# レビューディレクトリ（GitHubには含めない）
+review/
+
+# テストデータ（GitHubには含めない）
+test-data/
+*.test.db
+*.test.db-shm
+*.test.db-wal
+
+# 誤って作成されたファイル（GitHubには含めない）
+tash push -m 作業中の変更を一時保存
+tatus --short
+test.json
+rebase_helper.ps1
+rebase_script.txt
+
+# 内部用ドキュメント（GitHubには含めない）
+memo/
+実装完了報告_脆弱性修正.md
+実装計画_脆弱性修正.md
+脆弱性修正_パフォーマンス影響分析.md
+
+# documentsディレクトリ全体（GitHubには含めない）
+documents/
+
+# src/content/help内の参照されていないドキュメント（GitHubには含めない）
+src/content/help/concerns-improvements.md
+src/content/help/design-architecture.md
+src/content/help/project-overview.md
+src/content/help/troubleshooting.md
+
+# memo内のファイル（GitHubには含めない）
+memo/2025-11-13_feature-discussion-dm-learning-system.md
+memo/2025-11-17_node-memory.md
+
+# public内の参照されていないドキュメント（GitHubには含めない）
+public/help/images/user-manual/README.md
