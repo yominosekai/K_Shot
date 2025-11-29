@@ -281,7 +281,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type'); // 'overall' | 'individual'
-    const userId = searchParams.get('userId') || searchParams.get('userSid'); // 後方互換性のため userSid も受け付ける
+    const userId = searchParams.get('userId');
     const period = searchParams.get('period') as Period || '1month';
     const startDate = searchParams.get('startDate'); // カスタム範囲の開始日
     const endDate = searchParams.get('endDate');     // カスタム範囲の終了日
