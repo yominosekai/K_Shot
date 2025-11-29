@@ -11,7 +11,7 @@ const MODULE_NAME = 'api/materials/[id]/utils/database-updater';
  */
 export async function updateMaterialInDatabase(
   materialId: string,
-  userSid: string,
+  userId: string,
   updateParams: {
     title: string;
     description: string | null;
@@ -55,7 +55,7 @@ export async function updateMaterialInDatabase(
       update.run(...params);
       if (retryCount > 0) {
         debug(MODULE_NAME, `SQLite更新成功（リトライ ${retryCount}回後）: materialId=${materialId}`);
-        await logBusyError(userSid, 'updateMaterial', retryCount, true, { materialId, title: updateParams.title });
+        await logBusyError(userId, 'updateMaterial', retryCount, true, { materialId, title: updateParams.title });
       } else {
         debug(MODULE_NAME, `SQLite更新: materialId=${materialId}`);
       }
@@ -75,7 +75,7 @@ export async function updateMaterialInDatabase(
   
   if (retryCount >= maxRetries && lastError) {
     error(MODULE_NAME, `SQLite更新失敗（最大リトライ回数に達しました）: materialId=${materialId}`, lastError);
-    await logBusyError(userSid, 'updateMaterial', retryCount, false, { materialId, title: updateParams.title });
+    await logBusyError(userId, 'updateMaterial', retryCount, false, { materialId, title: updateParams.title });
     throw lastError;
   }
 }

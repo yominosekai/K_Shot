@@ -11,11 +11,11 @@ const MODULE_NAME = 'comments';
  */
 export async function getMaterialComments(
   materialId: string,
-  currentUserSid: string,
+  currentUserId: string,
   materialCreatedBy: string
 ): Promise<MaterialCommentNormalized[]> {
   try {
-    debug(MODULE_NAME, `getMaterialComments開始: materialId=${materialId}, currentUserSid=${currentUserSid}`);
+    debug(MODULE_NAME, `getMaterialComments開始: materialId=${materialId}, currentUserId=${currentUserId}`);
 
     const db = getDatabase();
 
@@ -34,8 +34,8 @@ export async function getMaterialComments(
     // 権限チェックと正規化
     const normalizedComments: MaterialCommentNormalized[] = comments.map((row) => {
       const isPrivate = row.is_private === 1;
-      const isCreator = row.created_by === currentUserSid;
-      const isMaterialCreator = currentUserSid === materialCreatedBy;
+      const isCreator = row.created_by === currentUserId;
+      const isMaterialCreator = currentUserId === materialCreatedBy;
 
       // 可視性チェック
       let canView = false;
@@ -50,7 +50,7 @@ export async function getMaterialComments(
           // 親コメントが自分のprivateコメントの場合、返信も見られる
           if (row.parent_comment_id) {
             const parentComment = comments.find((c) => c.id === row.parent_comment_id);
-            if (parentComment && parentComment.created_by === currentUserSid && parentComment.is_private === 1) {
+            if (parentComment && parentComment.created_by === currentUserId && parentComment.is_private === 1) {
               canView = true;
             }
           }

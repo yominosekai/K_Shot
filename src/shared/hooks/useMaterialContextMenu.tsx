@@ -9,7 +9,7 @@ import type { MaterialNormalized, FolderNormalized } from '@/features/materials/
 
 interface UseMaterialContextMenuProps {
   currentPath: string;
-  userSid?: string;
+  userId?: string;
   copyPath: (folder?: FolderNormalized, material?: MaterialNormalized) => Promise<void>;
   moveMaterialToTrash: (material: MaterialNormalized) => void;
   moveFolderToTrash: (folder: FolderNormalized) => void;
@@ -28,7 +28,7 @@ interface UseMaterialContextMenuProps {
 
 export function useMaterialContextMenu({
   currentPath,
-  userSid,
+  userId,
   copyPath,
   moveMaterialToTrash,
   moveFolderToTrash,

@@ -9,7 +9,7 @@ interface CommentListProps {
   material: MaterialNormalized | null;
   loading: boolean;
   userCache: Map<string, any>;
-  currentUserSid?: string;
+  currentUserId?: string;
   editingCommentId: string | null;
   editContent: string;
   onEditContentChange: (content: string) => void;
@@ -25,7 +25,7 @@ export default function CommentList({
   material,
   loading,
   userCache,
-  currentUserSid,
+  currentUserId,
   editingCommentId,
   editContent,
   onEditContentChange,
@@ -52,7 +52,7 @@ export default function CommentList({
           material={material}
           depth={0}
           userCache={userCache}
-          currentUserSid={currentUserSid}
+          currentUserId={currentUserId}
           editingCommentId={editingCommentId}
           editContent={editContent}
           onEditContentChange={onEditContentChange}

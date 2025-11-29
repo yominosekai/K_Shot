@@ -164,9 +164,9 @@ export async function PUT(
         if (retryCount > 0) {
           debug(MODULE_NAME, `SQLite更新成功（リトライ ${retryCount}回後）: materialId=${materialId}`);
           // SQLITE_BUSYが発生したが最終的に成功した場合のログ
-          const userSid = existingMaterial.created_by;
-          if (userSid) {
-            await logBusyError(userSid, 'moveMaterial', retryCount, true, { materialId, targetFolderPath });
+          const userId = existingMaterial.created_by;
+          if (userId) {
+            await logBusyError(userId, 'moveMaterial', retryCount, true, { materialId, targetFolderPath });
           }
         } else {
           debug(MODULE_NAME, `SQLite更新: materialId=${materialId}`);
@@ -188,9 +188,9 @@ export async function PUT(
     if (retryCount >= maxRetries && lastError) {
       error(MODULE_NAME, `SQLite更新失敗（最大リトライ回数に達しました）: materialId=${materialId}`, lastError);
       // SQLITE_BUSYが発生して最終的に失敗した場合のログ
-      const userSid = existingMaterial.created_by;
-      if (userSid) {
-        await logBusyError(userSid, 'moveMaterial', retryCount, false, { materialId, targetFolderPath });
+      const userId = existingMaterial.created_by;
+      if (userId) {
+        await logBusyError(userId, 'moveMaterial', retryCount, false, { materialId, targetFolderPath });
       }
       throw lastError;
     }

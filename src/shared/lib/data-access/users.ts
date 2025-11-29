@@ -164,7 +164,7 @@ async function saveUserToDatabase(user: User): Promise<void> {
           debug(MODULE_NAME, `ユーザー保存成功（リトライ ${retryCount}回後）: id=${serialized.id}`);
           // SQLITE_BUSYが発生したが最終的に成功した場合のログ
           await logBusyError(serialized.id, 'saveUserToDatabase', retryCount, true, {
-            targetSid: serialized.id,
+            targetUserId: serialized.id,
           });
         } else {
           debug(MODULE_NAME, `ユーザー保存: id=${serialized.id}`);
@@ -191,7 +191,7 @@ async function saveUserToDatabase(user: User): Promise<void> {
       );
       // SQLITE_BUSYが発生して最終的に失敗した場合のログ
       await logBusyError(serialized.id, 'saveUserToDatabase', retryCount, false, {
-        targetSid: serialized.id,
+        targetUserId: serialized.id,
       });
       throw lastError;
     }

@@ -9,7 +9,7 @@ import type { User as UserType } from '@/features/auth/types';
 interface NotificationFavorite {
   id: string;
   name: string;
-  userSids: string[];
+  userIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -76,7 +76,7 @@ export default function NotificationFavoritesManager({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: favoriteName.trim(),
-          userSids: Array.from(selectedUserIds),
+          userIds: Array.from(selectedUserIds),
         }),
       });
 
@@ -122,7 +122,7 @@ export default function NotificationFavoritesManager({
   };
 
   const handleApplyFavorite = (favorite: NotificationFavorite) => {
-    onApplyFavorite(favorite.userSids);
+    onApplyFavorite(favorite.userIds);
   };
 
   return (

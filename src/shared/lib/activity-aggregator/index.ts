@@ -62,12 +62,12 @@ function updateProcessedLogState(userId: string, logPath: string, lastOffset: nu
   stmt.run(userId, logPath, lastOffset, new Date().toISOString());
 }
 
-async function processLogFile(userSid: string, logPath: string): Promise<void> {
+async function processLogFile(userId: string, logPath: string): Promise<void> {
   if (!fs.existsSync(logPath)) {
     return;
   }
 
-  const state = getProcessedLogState(userSid, logPath);
+  const state = getProcessedLogState(userId, logPath);
   const stats = fs.statSync(logPath);
 
   if (stats.size === state.last_offset) {
@@ -116,12 +116,12 @@ async function processLogFile(userSid: string, logPath: string): Promise<void> {
           metadata?: { materialId?: string };
         };
         if (entry.eventType === 'login') {
-          insertLogin.run(entry.date, userSid);
+          insertLogin.run(entry.date, userId);
         } else if (entry.eventType === 'material_view') {
           insertMaterialView.run(entry.date);
         }
       } catch (err) {
-        error('activity-aggregator', `Failed to parse activity log entry for userSid=${userSid}`, err);
+        error('activity-aggregator', `Failed to parse activity log entry for userId=${userId}`, err);
       }
     }
   });
@@ -129,7 +129,7 @@ async function processLogFile(userSid: string, logPath: string): Promise<void> {
   let streamErrored = false;
   stream.on('error', (err) => {
     streamErrored = true;
-    error('activity-aggregator', `Failed to read activity log for userSid=${userSid}`, err);
+    error('activity-aggregator', `Failed to read activity log for userId=${userId}`, err);
   });
 
   try {
@@ -146,12 +146,12 @@ async function processLogFile(userSid: string, logPath: string): Promise<void> {
         date: string;
       };
       if (entry.eventType === 'login') {
-        insertLogin.run(entry.date, userSid);
+        insertLogin.run(entry.date, userId);
       } else if (entry.eventType === 'material_view') {
         insertMaterialView.run(entry.date);
       }
     } catch (err) {
-      error('activity-aggregator', `Failed to parse trailing activity log entry for userSid=${userSid}`, err);
+      error('activity-aggregator', `Failed to parse trailing activity log entry for userId=${userId}`, err);
     }
   }
 
@@ -160,7 +160,7 @@ async function processLogFile(userSid: string, logPath: string): Promise<void> {
   }
 
   const newOffset = state.last_offset + bytesRead;
-  updateProcessedLogState(userSid, logPath, newOffset);
+  updateProcessedLogState(userId, logPath, newOffset);
 }
 
 /**
@@ -201,9 +201,9 @@ export async function updateActivityAggregation(): Promise<void> {
   const userDirs = fs.readdirSync(usersDir, { withFileTypes: true }).filter((dirent) => dirent.isDirectory());
 
   for (const dirent of userDirs) {
-    const userSid = dirent.name;
-    const logPath = path.join(usersDir, userSid, ACTIVITY_LOG_FILENAME);
-    await processLogFile(userSid, logPath);
+    const userId = dirent.name;
+    const logPath = path.join(usersDir, userId, ACTIVITY_LOG_FILENAME);
+    await processLogFile(userId, logPath);
   }
 
   debug('activity-aggregator', `集計処理完了: 今日=${today}`);

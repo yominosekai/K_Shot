@@ -157,8 +157,8 @@ export default function NotificationSendModal({
     }
   };
 
-  const handleApplyFavorite = (userSids: string[]) => {
-    setSelectedUserIds(new Set(userSids));
+  const handleApplyFavorite = (userIds: string[]) => {
+    setSelectedUserIds(new Set(userIds));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -176,7 +176,8 @@ export async function authenticateUser(): Promise<AuthResponse> {
   }
 }
 
-// 互換用エクスポート（旧名称）
+// 互換用エクスポート（旧名称・非推奨）
+// @deprecated この関数は後方互換性のために残されていますが、`authenticateUser()`を使用してください。
 export async function authenticateUserWithSID(): Promise<AuthResponse> {
   return authenticateUser();
 }

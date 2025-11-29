@@ -52,8 +52,8 @@ export default function MaterialRevisionHistory({
       <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
         {revisionHistory.map((revision) => {
           // updated_byがnullの場合、material.created_byを使う
-          const effectiveSid = revision.updated_by || material.created_by;
-          const revisionUser = effectiveSid ? userCache.get(effectiveSid) : null;
+          const effectiveUserId = revision.updated_by || material.created_by;
+          const revisionUser = effectiveUserId ? userCache.get(effectiveUserId) : null;
           
           return (
             <div
@@ -69,16 +69,16 @@ export default function MaterialRevisionHistory({
               <div className="flex items-center gap-2 justify-end">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold overflow-hidden ring-1 ring-gray-200 dark:ring-gray-700 flex-shrink-0">
                   {(() => {
-                    if (!effectiveSid) {
+                    if (!effectiveUserId) {
                       return (
                         <span>
                           {revision.updated_by_name?.charAt(0).toUpperCase() || 'U'}
                         </span>
                       );
                     }
-                    const avatarUrl = getAvatarUrl(effectiveSid);
+                    const avatarUrl = getAvatarUrl(effectiveUserId);
                     // タイムスタンプを含めたkeyを使用して、アバター更新時に強制的に再レンダリング
-                    const avatarKey = avatarUrl ? `${effectiveSid}-${avatarUrl.split('v=')[1] || Date.now()}` : `${effectiveSid}-no-avatar`;
+                    const avatarKey = avatarUrl ? `${effectiveUserId}-${avatarUrl.split('v=')[1] || Date.now()}` : `${effectiveUserId}-no-avatar`;
                     return avatarUrl ? (
                       <Image
                         key={avatarKey}
@@ -96,7 +96,7 @@ export default function MaterialRevisionHistory({
                       <span>
                         {revisionUser?.display_name?.charAt(0).toUpperCase() ||
                           revision.updated_by_name?.charAt(0).toUpperCase() ||
-                          effectiveSid?.charAt(0).toUpperCase() ||
+                          effectiveUserId?.charAt(0).toUpperCase() ||
                           'U'}
                       </span>
                     );
@@ -105,7 +105,7 @@ export default function MaterialRevisionHistory({
                 <span className="text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
                   {revisionUser?.display_name ||
                     revision.updated_by_name ||
-                    effectiveSid}
+                    effectiveUserId}
                 </span>
               </div>
             </div>

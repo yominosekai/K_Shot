@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
         },
         provisioning: {
           action: provisioningAction,
-          userSid: provisionResult.userSid,
+          userId: provisionResult.userId,
         },
       });
     }

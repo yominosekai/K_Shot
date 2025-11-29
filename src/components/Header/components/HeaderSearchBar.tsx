@@ -13,7 +13,7 @@ interface HeaderSearchBarProps {
   searchInputRef: React.RefObject<HTMLInputElement | null>;
   onSearch: (query: string) => void;
   onMaterialClick: (materialId: string) => void;
-  onUserClick: (userSid: string) => void;
+  onUserClick: (userId: string) => void;
 }
 
 export default function HeaderSearchBar({

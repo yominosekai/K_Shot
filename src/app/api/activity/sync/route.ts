@@ -45,13 +45,13 @@ export async function POST(request: NextRequest) {
     let current = 0;
 
     for (const dirent of userDirs) {
-      const userSid = dirent.name;
+      const userId = dirent.name;
       current++;
       
       progress.push({
         current,
         total: userDirs.length,
-        currentUser: userSid,
+        currentUser: userId,
       });
     }
 
@@ -104,11 +104,11 @@ export async function GET(request: NextRequest) {
 
         // 3. 各ユーザーのactivity_log.jsonを処理
         for (let i = 0; i < userDirs.length; i++) {
-          const userSid = userDirs[i].name;
+          const userId = userDirs[i].name;
           const progress = {
             current: i + 1,
             total: userDirs.length,
-            currentUser: `${userSid} のデータを同期中...`,
+            currentUser: `${userId} のデータを同期中...`,
           };
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(progress)}\n\n`));
           

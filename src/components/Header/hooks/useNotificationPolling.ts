@@ -9,13 +9,13 @@ import { useWebNotifications } from './useWebNotifications';
 export type { ConnectionStatus };
 
 interface UseNotificationPollingProps {
-  userSid: string | undefined;
+  userId: string | undefined;
   onNotificationCountChange: (count: number) => void;
   onNotificationReceived?: (count: number, previousCount: number) => void;
 }
 
 export function useNotificationPolling({
-  userSid,
+  userId,
   onNotificationCountChange,
   onNotificationReceived,
 }: UseNotificationPollingProps) {
@@ -36,12 +36,12 @@ export function useNotificationPolling({
 
   // 通知数の取得（軽量APIを使用）
   const fetchNotificationCount = async () => {
-    if (!userSid) return;
+    if (!userId) return;
 
     try {
-      const encodedSid = encodeURIComponent(userSid);
+      const encodedId = encodeURIComponent(userId);
       // 軽量API: 未読数カウントのみを取得
-      const response = await fetch(`/api/users/${encodedSid}/notifications/count`);
+      const response = await fetch(`/api/users/${encodedId}/notifications/count`);
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -55,7 +55,7 @@ export function useNotificationPolling({
           if (newCount > previousCount && onNotificationReceived) {
             // 新規通知検出時のみ通知一覧APIを呼び出して詳細を取得
             try {
-              const detailResponse = await fetch(`/api/users/${encodedSid}/notifications?unread_only=true&limit=1`);
+              const detailResponse = await fetch(`/api/users/${encodedId}/notifications?unread_only=true&limit=1`);
               if (detailResponse.ok) {
                 const detailData = await detailResponse.json();
                 if (detailData.success) {
@@ -98,7 +98,7 @@ export function useNotificationPolling({
 
   // 初回読み込み時と設定された間隔で通知数を取得
   useEffect(() => {
-    if (!userSid) return;
+    if (!userId) return;
 
     // 即座の場合はポーリングしない（ページフォーカス時のみ取得）
     let interval: NodeJS.Timeout | null = null;
@@ -220,7 +220,7 @@ export function useNotificationPolling({
       window.removeEventListener('notificationIntervalChanged', handleIntervalChange);
       window.removeEventListener('backgroundNotificationSettingChanged', handleBackgroundSettingChange);
     };
-  }, [userSid]);
+  }, [userId]);
 
   return {
     connectionStatus,
