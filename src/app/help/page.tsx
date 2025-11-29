@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { redirect } from 'next/navigation';
 import { ReactNode, Children, isValidElement, cloneElement, Fragment } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -9,7 +10,8 @@ import ManualToc, { type ManualHeading } from './components/ManualToc';
 import ManualDocSelector from './components/ManualDocSelector';
 import ManualSearchBar from './components/ManualSearchBar';
 import ManualSearchMatchNavigator from './components/ManualSearchMatchNavigator';
-import { manualDocs } from '@/content/help/docs';
+import { manualDocs, filterDocsByPermission, isAdminOnlyDoc } from '@/content/help/docs';
+import { requireAuth, isAdmin } from '@/shared/lib/auth/middleware';
 
 const getManualContent = (filePath: string) => {
   const content = fs.readFileSync(path.join(process.cwd(), filePath), 'utf-8');
@@ -89,8 +91,7 @@ const getTextFromNode = (children: ReactNode): string =>
       if (typeof child === 'string') return child;
       if (typeof child === 'number') return String(child);
       if (isValidElement(child)) {
-        const props = child.props as { children?: ReactNode };
-        return getTextFromNode(props.children);
+        return getTextFromNode((child.props as { children?: ReactNode })?.children);
       }
       return '';
     })
@@ -158,9 +159,9 @@ const highlightNode = (node: ReactNode, query?: string, registerHit?: RegisterHi
   }
 
   if (isValidElement(node)) {
-    const props = node.props as { children?: ReactNode } & Record<string, unknown>;
-    if (props.children) {
-      return cloneElement(node, {
+    const props = node.props as { children?: ReactNode };
+    if (props?.children) {
+    return cloneElement(node, {
         ...props,
         children: highlightNode(props.children, query, registerHit, docId),
       } as any);
@@ -184,15 +185,15 @@ const createMarkdownComponents = (searchQuery?: string, docId?: string, globalHi
   };
   const applyHighlight = (node: ReactNode) => highlightNode(node, searchQuery, registerHit, docId);
 
-  const MarkdownImage = ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
-    const srcString = typeof src === 'string' ? src : undefined;
+  const MarkdownImage = (props: React.ComponentProps<'img'>) => {
+    const { src, alt } = props;
     return (
-      <figure className="my-8 overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md bg-white dark:bg-slate-800">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={srcString} alt={alt} className="w-full h-auto" loading="lazy" {...props} />
-        {alt ? <figcaption className="text-sm text-gray-500 dark:text-gray-400 px-4 py-2">{alt}</figcaption> : null}
-      </figure>
-    );
+    <figure className="my-8 overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md bg-white dark:bg-slate-800">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={typeof src === 'string' ? src : undefined} alt={alt} className="w-full h-auto" loading="lazy" />
+      {alt ? <figcaption className="text-sm text-gray-500 dark:text-gray-400 px-4 py-2">{alt}</figcaption> : null}
+    </figure>
+  );
   };
 
   const Paragraph = ({ children }: { children?: ReactNode }) => {
@@ -303,9 +304,9 @@ const createMarkdownComponents = (searchQuery?: string, docId?: string, globalHi
           ));
         }
         if (isValidElement(node)) {
-          const props = node.props as { children?: ReactNode } & Record<string, unknown>;
-          if (props.children) {
-            return cloneElement(node, {
+          const props = node.props as { children?: ReactNode };
+          if (props?.children) {
+          return cloneElement(node, {
               ...props,
               children: processBrTags(props.children),
             } as any);
@@ -329,6 +330,19 @@ type ManualPageProps = {
 };
 
 export default async function ManualPage({ searchParams }: ManualPageProps) {
+  // 認証チェック（キャッシュを使用）
+  const authResult = await requireAuth();
+  if (!authResult.success) {
+    redirect('/');
+  }
+
+  // 通常はキャッシュされたユーザー情報を使用
+  let user = authResult.user;
+  let userIsAdmin = isAdmin(user);
+
+  // 権限に応じてドキュメントをフィルタリング
+  const availableDocs = filterDocsByPermission(manualDocs, userIsAdmin);
+
   const resolvedSearchParams = (await searchParams) ?? {};
   const docParam = resolvedSearchParams.doc;
   const docIdParam = Array.isArray(docParam) ? docParam[0] : docParam;
@@ -339,7 +353,13 @@ export default async function ManualPage({ searchParams }: ManualPageProps) {
   const matchParamValue = Array.isArray(matchParam) ? matchParam[0] : matchParam;
   const requestedMatchIndex = matchParamValue ? Number(matchParamValue) || 1 : 1;
 
-  const docsWithContent = manualDocs.map((doc) => ({
+  // 管理者以外が管理者専用ドキュメントにアクセスしようとした場合のリダイレクト
+  if (docIdParam && isAdminOnlyDoc(docIdParam) && !userIsAdmin) {
+    redirect('/help');
+  }
+
+  // フィルタリングされたドキュメントのみを処理
+  const docsWithContent = availableDocs.map((doc) => ({
     ...doc,
     content: getManualContent(doc.file),
   }));
@@ -386,7 +406,20 @@ export default async function ManualPage({ searchParams }: ManualPageProps) {
   // グローバルインデックスから現在のドキュメント内のローカルインデックスを取得
   const currentGlobalIndex = requestedMatchIndex <= totalMatchCount ? requestedMatchIndex : 1;
   const currentMatch = allMatches.find((m) => m.globalIndex === currentGlobalIndex);
-  const currentMatchIndex = currentMatch ? currentMatch.localIndex : (activeDocMatchCount > 0 ? Math.min(Math.max(requestedMatchIndex, 1), activeDocMatchCount) : 0);
+  
+  // 現在のドキュメント内のマッチを探す
+  let currentMatchIndex = 0;
+  if (currentMatch && currentMatch.docId === activeDoc.id) {
+    // 現在のドキュメント内のマッチの場合、そのローカルインデックスを使う
+    currentMatchIndex = currentMatch.localIndex;
+  } else if (normalizedQuery && activeDocMatchCount > 0) {
+    // 現在のドキュメント内のマッチを探す
+    const activeDocMatches = allMatches.filter((m) => m.docId === activeDoc.id);
+    if (activeDocMatches.length > 0) {
+      // 現在のドキュメント内の最初のマッチのローカルインデックスを使う
+      currentMatchIndex = activeDocMatches[0].localIndex;
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-slate-900 dark:text-slate-100">
@@ -397,7 +430,7 @@ export default async function ManualPage({ searchParams }: ManualPageProps) {
           <p className="text-gray-600 dark:text-slate-300 leading-relaxed">{activeDoc.description}</p>
           <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:gap-6">
             <div className="flex-1">
-              <ManualDocSelector activeDocId={activeDoc.id} />
+              <ManualDocSelector activeDocId={activeDoc.id} availableDocs={availableDocs} />
             </div>
             <div className="lg:ml-auto lg:mt-0">
               <ManualSearchBar

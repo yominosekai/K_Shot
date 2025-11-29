@@ -5,15 +5,15 @@ import { getUserProfile } from '@/shared/lib/data-access/users';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { sid } = await params;
-    // URLエンコードされたSIDをデコード
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = await params;
+    // URLエンコードされたIDをデコード
+    const decodedId = decodeURIComponent(id);
     
     // getUserProfileを使用（getUserDataではないので、last_login更新は発生しない）
-    const user = await getUserProfile(decodedSid);
+    const user = await getUserProfile(decodedId);
 
     if (!user) {
       return NextResponse.json(

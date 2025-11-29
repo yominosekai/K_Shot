@@ -9,7 +9,7 @@ import { getUsersRootPath } from '@/shared/lib/file-system/user-storage';
 const ACTIVITY_LOG_FILENAME = 'logs/activity_log.json';
 
 interface ProcessedLogState {
-  user_sid: string;
+  user_id: string;
   log_path: string;
   last_offset: number;
   updated_at: string;
@@ -33,14 +33,14 @@ export function getUsersDir(): string | null {
   }
 }
 
-function getProcessedLogState(userSid: string, logPath: string) {
+function getProcessedLogState(userId: string, logPath: string) {
   const db = getActivityAggregatorDb();
   const stmt = db
-    .prepare('SELECT user_sid, log_path, last_offset, updated_at FROM processed_logs WHERE user_sid = ?');
-  const row = stmt.get(userSid) as ProcessedLogState | undefined;
+    .prepare('SELECT user_id, log_path, last_offset, updated_at FROM processed_logs WHERE user_id = ?');
+  const row = stmt.get(userId) as ProcessedLogState | undefined;
   if (!row) {
     return {
-      user_sid: userSid,
+      user_id: userId,
       log_path: logPath,
       last_offset: 0,
       updated_at: new Date(0).toISOString(),
@@ -49,17 +49,17 @@ function getProcessedLogState(userSid: string, logPath: string) {
   return row;
 }
 
-function updateProcessedLogState(userSid: string, logPath: string, lastOffset: number) {
+function updateProcessedLogState(userId: string, logPath: string, lastOffset: number) {
   const db = getActivityAggregatorDb();
   const stmt = db.prepare(`
-    INSERT INTO processed_logs (user_sid, log_path, last_offset, updated_at)
+    INSERT INTO processed_logs (user_id, log_path, last_offset, updated_at)
     VALUES (?, ?, ?, ?)
-    ON CONFLICT(user_sid) DO UPDATE SET
+    ON CONFLICT(user_id) DO UPDATE SET
       log_path = excluded.log_path,
       last_offset = excluded.last_offset,
       updated_at = excluded.updated_at
   `);
-  stmt.run(userSid, logPath, lastOffset, new Date().toISOString());
+  stmt.run(userId, logPath, lastOffset, new Date().toISOString());
 }
 
 async function processLogFile(userSid: string, logPath: string): Promise<void> {
@@ -88,9 +88,9 @@ async function processLogFile(userSid: string, logPath: string): Promise<void> {
   let remainder = '';
   const db = getActivityAggregatorDb();
   const insertLogin = db.prepare(`
-    INSERT INTO login_events (date, user_sid)
+    INSERT INTO login_events (date, user_id)
     VALUES (?, ?)
-    ON CONFLICT(date, user_sid) DO NOTHING
+    ON CONFLICT(date, user_id) DO NOTHING
   `);
   const insertMaterialView = db.prepare(`
     INSERT INTO material_view_daily (date, view_count)

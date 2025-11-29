@@ -188,7 +188,7 @@ export default function SetupPage() {
       const deviceTokenFile = JSON.parse(text);
 
       // 必須フィールドの検証
-      const requiredFields = ['schema_version', 'token', 'signature', 'user_sid', 'issued_at'];
+      const requiredFields = ['schema_version', 'token', 'signature', 'user_id', 'issued_at'];
       for (const field of requiredFields) {
         if (!deviceTokenFile[field]) {
           throw new Error(`必須フィールドが不足しています: ${field}`);

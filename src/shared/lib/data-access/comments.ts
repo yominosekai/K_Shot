@@ -26,7 +26,7 @@ export async function getMaterialComments(
         u.display_name as created_by_name,
         u.avatar as created_by_avatar
       FROM material_comments c
-      LEFT JOIN users u ON c.created_by = u.sid
+      LEFT JOIN users u ON c.created_by = u.id
       WHERE c.material_id = ?
       ORDER BY c.created_date ASC
     `).all(materialId) as any[];

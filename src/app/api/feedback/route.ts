@@ -1,7 +1,7 @@
 // フィードバックAPI Routes
 
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateUser } from '@/features/auth/api/auth';
+import { requireAuth } from '@/shared/lib/auth/middleware';
 import { saveFeedback, getUserFeedbacks, getAllPublicFeedbacksPaginated } from '@/shared/lib/data-access/feedback';
 import { info, error, debug } from '@/shared/lib/logger';
 
@@ -13,15 +13,13 @@ const MODULE_NAME = 'api/feedback';
  */
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await authenticateUser();
-    if (!authResult.success || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
+    // 認証チェック
+    const authResult = await requireAuth();
+    if (!authResult.success) {
+      return authResult.response;
     }
 
-    const userId = authResult.user.id ?? authResult.user.sid;
+    const userId = authResult.user.id;
     if (!userId) {
       return NextResponse.json(
         { success: false, error: 'ユーザーIDを特定できませんでした' },
@@ -80,12 +78,10 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const authResult = await authenticateUser();
-    if (!authResult.success || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
+    // 認証チェック
+    const authResult = await requireAuth();
+    if (!authResult.success) {
+      return authResult.response;
     }
 
     const body = await request.json();
@@ -105,7 +101,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userId = authResult.user.id ?? authResult.user.sid;
+    const userId = authResult.user.id;
     if (!userId) {
       return NextResponse.json(
         { success: false, error: 'ユーザーIDを特定できませんでした' },

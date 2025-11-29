@@ -7,12 +7,12 @@ import type { MaterialNormalized } from '@/features/materials/types';
 export function useMaterialDetail() {
   const { user } = useAuth();
 
-  // 資料詳細を取得（閲覧数カウント用にuser_sidを渡す）
+  // 資料詳細を取得（閲覧数カウント用にuser_idを渡す）
   const fetchMaterialDetail = useCallback(
     async (materialId: string): Promise<MaterialNormalized | null> => {
       try {
-        const url = user?.sid
-          ? `/api/materials/${materialId}?user_sid=${user.sid}`
+        const url = user?.id
+          ? `/api/materials/${materialId}?user_id=${user.id}`
           : `/api/materials/${materialId}`;
         const response = await fetch(url);
         if (!response.ok) {
@@ -29,7 +29,7 @@ export function useMaterialDetail() {
         return null;
       }
     },
-    [user?.sid]
+    [user?.id]
   );
 
   return {

@@ -15,7 +15,7 @@ async function testAuth() {
     return;
   }
   console.log('✅ デバイストークンを読み込みました');
-  console.log('   user_sid:', token.user_sid);
+  console.log('   user_id:', token.user_id);
   console.log('   token:', token.token);
   console.log('   device_label:', token.device_label);
 
@@ -32,19 +32,21 @@ async function testAuth() {
   console.log('\n3. データベースでトークンのステータス確認...');
   try {
     const db = getDatabase();
-    const tokenRecord = db.prepare(
-      'SELECT status, user_sid FROM device_tokens WHERE token = ?'
-    ).get(token.token) as { status: string; user_sid: string } | undefined;
+    const tokenRecord = db
+      .prepare('SELECT status, user_id FROM device_tokens WHERE token = ?')
+      .get(token.token) as { status: string; user_id: string } | undefined;
 
     if (!tokenRecord) {
       console.error('❌ デバイストークンがデータベースに見つかりません');
       console.log('   データベース内のトークンを確認します...');
-      const allTokens = db.prepare(
-        'SELECT token, user_sid, status FROM device_tokens LIMIT 5'
-      ).all() as Array<{ token: string; user_sid: string; status: string }>;
+      const allTokens = db
+        .prepare('SELECT token, user_id, status FROM device_tokens LIMIT 5')
+        .all() as Array<{ token: string; user_id: string; status: string }>;
       console.log(`   見つかったトークン数: ${allTokens.length}`);
       allTokens.forEach((t, i) => {
-        console.log(`   ${i + 1}. token: ${t.token.substring(0, 20)}..., user_sid: ${t.user_sid}, status: ${t.status}`);
+        console.log(
+          `   ${i + 1}. token: ${t.token.substring(0, 20)}..., user_id: ${t.user_id}, status: ${t.status}`
+        );
       });
       return;
     }
@@ -54,16 +56,16 @@ async function testAuth() {
       return;
     }
 
-    if (tokenRecord.user_sid !== token.user_sid) {
-      console.error('❌ ユーザーSIDが一致しません');
-      console.log('   トークンファイルのuser_sid:', token.user_sid);
-      console.log('   データベースのuser_sid:', tokenRecord.user_sid);
+    if (tokenRecord.user_id !== token.user_id) {
+      console.error('❌ ユーザーIDが一致しません');
+      console.log('   トークンファイルのuser_id:', token.user_id);
+      console.log('   データベースのuser_id:', tokenRecord.user_id);
       return;
     }
 
     console.log('✅ トークンのステータス確認成功');
     console.log('   status:', tokenRecord.status);
-    console.log('   user_sid:', tokenRecord.user_sid);
+    console.log('   user_id:', tokenRecord.user_id);
   } catch (err) {
     console.error('❌ データベースアクセスエラー:', err);
     return;
@@ -72,15 +74,15 @@ async function testAuth() {
   // 4. ユーザーデータの取得
   console.log('\n4. ユーザーデータの取得...');
   try {
-    const user = await getUserData(token.user_sid);
+    const user = await getUserData(token.user_id);
     if (!user) {
       console.error('❌ ユーザーが見つかりません');
-      console.log('   user_sid:', token.user_sid);
+      console.log('   user_id:', token.user_id);
       return;
     }
 
     console.log('✅ ユーザーデータを取得しました');
-    console.log('   SID:', user.id);
+    console.log('   ID:', user.id);
     console.log('   表示名:', user.display_name);
     console.log('   ユーザー名:', user.username);
     console.log('   メール:', user.email);

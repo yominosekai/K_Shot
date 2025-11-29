@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     // 日本時間（JST）基準で30日前を計算
     const thirtyDaysAgo = getJSTDateStart(30);
     const activeUsers = db
-      .prepare('SELECT COUNT(DISTINCT sid) as count FROM users WHERE is_active = 1 AND last_login >= ?')
+      .prepare('SELECT COUNT(DISTINCT id) as count FROM users WHERE is_active = 1 AND last_login >= ?')
       .get(thirtyDaysAgo.toISOString()) as { count: number };
 
     // 総資料数

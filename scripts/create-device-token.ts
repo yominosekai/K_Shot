@@ -9,10 +9,10 @@ const DEVICE_TOKEN_DATA = {
   schema_version: '1.0.0',
   token: '1e12a1ec-5c80-44d4-9f3d-8d34c5a74cc4',
   signature: '859d0454b1653c499efd197bcc29bf8a9df84db8bc9c485935dd1a1edddef95b',
-  user_sid: '3d396eb3-656b-4d12-b890-0701f83a0463',
+  user_id: '3d396eb3-656b-4d12-b890-0701f83a0463',
   issued_at: '2025-11-24T16:25:57.113Z',
   device_label: 'device-33327b',
-  signature_version: 1
+  signature_version: 1,
 };
 
 function resolveDefaultTokenDir(): string {

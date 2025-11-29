@@ -45,14 +45,14 @@ export async function GET(request: NextRequest) {
       // 日次データ（user_activitiesテーブルから集計）
       const newUsersQuery = db.prepare(`
         SELECT 
-          sid,
+          id,
           created_date
         FROM users
         WHERE created_date >= ?
       `);
 
       const startDateJST = getJSTDateString(days);
-      const newUsersRaw = newUsersQuery.all(startDateStr) as Array<{ sid: string; created_date: string }>;
+      const newUsersRaw = newUsersQuery.all(startDateStr) as Array<{ id: string; created_date: string }>;
 
       // 新規ユーザーはcreated_dateをJSTに変換して集計
       const newUsersMap = new Map<string, Set<string>>();
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
         if (!newUsersMap.has(jstDate)) {
           newUsersMap.set(jstDate, new Set());
         }
-        newUsersMap.get(jstDate)!.add(item.sid);
+        newUsersMap.get(jstDate)!.add(item.id);
       });
 
       const newUsersCountMap = new Map<string, number>();
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
         weekEnd.setHours(23, 59, 59, 999);
 
         const activeUsers = db
-          .prepare('SELECT COUNT(DISTINCT sid) as count FROM users WHERE is_active = 1 AND last_login >= ? AND last_login < ?')
+          .prepare('SELECT COUNT(DISTINCT id) as count FROM users WHERE is_active = 1 AND last_login >= ? AND last_login < ?')
           .get(weekStart.toISOString(), weekEnd.toISOString()) as { count: number };
 
         const newUsers = db
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
         const monthEndUTC = new Date(monthEnd.getTime() - 9 * 60 * 60 * 1000);
 
         const activeUsers = db
-          .prepare('SELECT COUNT(DISTINCT sid) as count FROM users WHERE is_active = 1 AND last_login >= ? AND last_login < ?')
+          .prepare('SELECT COUNT(DISTINCT id) as count FROM users WHERE is_active = 1 AND last_login >= ? AND last_login < ?')
           .get(monthStart.toISOString(), monthEndUTC.toISOString()) as { count: number };
 
         const newUsers = db

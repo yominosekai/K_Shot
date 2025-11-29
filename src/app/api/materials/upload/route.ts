@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     const estimated_hours = formData.get('estimated_hours') as string;
     const tags = formData.get('tags') as string;
     const content = formData.get('content') as string; // document.mdの内容
-    const userSid = formData.get('user_sid') as string; // 作成者のSID
+    const userId = formData.get('user_id') as string; // 作成者のユーザーID
     const folderPath = (formData.get('folder_path') as string) || ''; // フォルダパス
     const userDisplayName = (formData.get('user_display_name') as string) || '';
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!userSid) {
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: 'ユーザー情報が取得できません' },
         { status: 401 }
@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
       estimated_hours: estimated_hours ? parseFloat(estimated_hours) : undefined,
       tags: tags ? tags.split(',').map((tag) => tag.trim()).filter((tag) => tag) : [],
       folder_path: folderPath, // フォルダパスを追加
-      created_by: userSid,
+      created_by: userId,
       created_date: now,
       updated_date: now,
       is_published: true,
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
       estimated_hours ? parseFloat(estimated_hours) : null,
       tags || '',
       folderPath || '',
-      userSid,
+      userId,
       now,
       now,
       1, // is_published
@@ -246,9 +246,12 @@ export async function POST(request: NextRequest) {
       try {
         insert.run(...params);
         if (retryCount > 0) {
-          debug(MODULE_NAME, `SQLiteに資料を追加成功（リトライ ${retryCount}回後）: materialId=${materialId}`);
+          debug(
+            MODULE_NAME,
+            `SQLiteに資料を追加成功（リトライ ${retryCount}回後）: materialId=${materialId}`
+          );
           // SQLITE_BUSYが発生したが最終的に成功した場合のログ
-          await logBusyError(userSid, 'uploadMaterial', retryCount, true, { materialId, title });
+          await logBusyError(userId, 'uploadMaterial', retryCount, true, { materialId, title });
         } else {
           debug(MODULE_NAME, `SQLiteに資料を追加: materialId=${materialId}`);
         }
@@ -269,15 +272,19 @@ export async function POST(request: NextRequest) {
     }
     
     if (retryCount >= maxRetries && lastError) {
-      error(MODULE_NAME, `SQLite書き込み失敗（最大リトライ回数に達しました）: materialId=${materialId}`, lastError);
+      error(
+        MODULE_NAME,
+        `SQLite書き込み失敗（最大リトライ回数に達しました）: materialId=${materialId}`,
+        lastError
+      );
       // SQLITE_BUSYが発生して最終的に失敗した場合のログ
-      await logBusyError(userSid, 'uploadMaterial', retryCount, false, { materialId, title });
+      await logBusyError(userId, 'uploadMaterial', retryCount, false, { materialId, title });
       throw lastError;
     }
 
     await addMaterialRevision({
       materialId,
-      updatedBy: userSid,
+      updatedBy: userId,
       updatedByName: userDisplayName || undefined,
       comment: '初回登録',
     });
@@ -294,7 +301,7 @@ export async function POST(request: NextRequest) {
         type,
         tags: metadata.tags,
         folder_path: folderPath,
-        created_by: userSid,
+        created_by: userId,
         created_date: now,
         updated_date: now,
         is_published: true,

@@ -19,7 +19,7 @@ export interface TrashItem {
   original_path: string; // 元の完全パス（Z:\k_shot\shared\shared_materials\...）
   original_name: string; // 元の名前
   trash_name: string; // ゴミ箱での名前（連番付きの場合あり）
-  deleted_by: string; // 削除したユーザーのSID
+  deleted_by: string; // 削除したユーザーのID
   deleted_date: string; // 削除日時（ISO形式）
   original_folder_path?: string; // フォルダパス（資料の場合）
 }

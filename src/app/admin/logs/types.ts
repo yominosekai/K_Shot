@@ -3,8 +3,8 @@
 export interface LogEntry {
   timestamp: string;
   logType: 'error' | 'busy';
-  user_sid?: string;
-  userSid?: string;
+  user_id?: string;
+  userId?: string;
   userDisplayName?: string;
   userUsername?: string;
   // エラーログ用

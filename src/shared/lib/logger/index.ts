@@ -84,7 +84,7 @@ function levelToString(level: LogLevel): string {
 /**
  * 現在のユーザー識別子を取得（ローカル証明ファイルベース）
  */
-async function getCurrentUserSID(): Promise<string | null> {
+async function getCurrentUserId(): Promise<string | null> {
   try {
     const token = readDeviceToken();
     if (!token) {
@@ -95,7 +95,7 @@ async function getCurrentUserSID(): Promise<string | null> {
       return null;
     }
 
-    return token.user_sid;
+    return token.user_id;
   } catch {
     return null;
   }
@@ -103,12 +103,12 @@ async function getCurrentUserSID(): Promise<string | null> {
 
 /**
  * エラーログファイルのパスを取得
- * @param userSid ユーザーSID（指定しない場合はサーバーを起動しているユーザーのSIDを使用）
+ * @param userId ユーザーID（指定しない場合はサーバーを起動しているユーザーのIDを使用）
  * @returns ログファイルのパス、ドライブ設定が完了していない場合はnull
  */
-function getErrorLogPath(userSid?: string): string | null {
+function getErrorLogPath(userId?: string): string | null {
   try {
-    const targetKey = userSid ?? 'system';
+    const targetKey = userId ?? 'system';
     return getUserSubPath(targetKey, 'logs', 'errors.json');
   } catch {
     return null;
@@ -122,25 +122,25 @@ async function writeErrorLogToFile(
   module: string,
   message: string,
   data: any,
-  userSid?: string
+  userId?: string
 ): Promise<void> {
   if (!config.enableFile) {
     return;
   }
 
   try {
-    // userSidが指定されていない場合は、サーバーを起動しているユーザーのSIDを取得
-    let targetSid: string | undefined = userSid;
-    if (!targetSid) {
-      const currentSid = await getCurrentUserSID();
-      // SIDが取得できない場合は記録しない（コンソール出力のみ）
-      if (!currentSid) {
+    // userIdが指定されていない場合は、サーバーを起動しているユーザーのIDを取得
+    let targetId: string | undefined = userId;
+    if (!targetId) {
+      const currentId = await getCurrentUserId();
+      // IDが取得できない場合は記録しない（コンソール出力のみ）
+      if (!currentId) {
         return;
       }
-      targetSid = currentSid;
+      targetId = currentId;
     }
 
-    const logPath = getErrorLogPath(targetSid);
+    const logPath = getErrorLogPath(targetId);
     // ドライブ設定が完了していない場合はファイルへの書き込みをスキップ
     if (!logPath) {
       return;
@@ -162,9 +162,9 @@ async function writeErrorLogToFile(
       message,
     };
 
-    // userSidを追加（指定された場合と取得した場合の両方）
-    if (targetSid) {
-      logEntry.user_sid = targetSid;
+    // userIdを追加（指定された場合と取得した場合の両方）
+    if (targetId) {
+      logEntry.user_id = targetId;
     }
 
     // エラーオブジェクトの処理
@@ -222,7 +222,7 @@ function log(
   module: string,
   message: string,
   data?: any,
-  userSid?: string
+  userId?: string
 ): void {
   if (!shouldLog(level)) {
     return;
@@ -247,7 +247,7 @@ function log(
   // ERRORレベルのみファイルに出力
   if (level === LogLevel.ERROR && config.enableFile) {
     // 非同期で実行（エラーが発生しても業務処理に影響しない）
-    writeErrorLogToFile(module, message, data, userSid).catch(() => {
+    writeErrorLogToFile(module, message, data, userId).catch(() => {
       // エラーは既にwriteErrorLogToFile内で処理されている
     });
   }
@@ -279,9 +279,9 @@ export function warn(module: string, message: string, data?: any): void {
  * @param module モジュール名
  * @param message エラーメッセージ
  * @param data エラーデータ（Errorオブジェクトまたは任意のデータ）
- * @param userSid ユーザー識別子（オプション、指定した場合はusers/{hash}/logs/errors.jsonに記録）
+ * @param userId ユーザー識別子（オプション、指定した場合はusers/{hash}/logs/errors.jsonに記録）
  */
-export function error(module: string, message: string, data?: any, userSid?: string): void {
-  log(LogLevel.ERROR, module, message, data, userSid);
+export function error(module: string, message: string, data?: any, userId?: string): void {
+  log(LogLevel.ERROR, module, message, data, userId);
 }
 

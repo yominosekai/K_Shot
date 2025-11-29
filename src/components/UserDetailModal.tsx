@@ -77,7 +77,7 @@ export default function UserDetailModal({ isOpen, onClose, user }: UserDetailMod
             {/* アバター */}
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-2xl font-bold overflow-hidden ring-2 ring-gray-200 dark:ring-gray-700">
               {(() => {
-                const avatarSourceId = user.id ?? user.sid;
+                const avatarSourceId = user.id;
                 const avatarUrl = avatarSourceId ? getAvatarUrl(avatarSourceId) : null;
                 return avatarUrl ? (
                   <Image

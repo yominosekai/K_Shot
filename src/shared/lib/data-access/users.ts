@@ -9,7 +9,7 @@ import { saveAvatar, deleteAvatar } from '../file-system/avatar';
 const MODULE_NAME = 'users';
 
 interface UserRow {
-  sid: string;
+  id: string;
   username: string;
   display_name: string;
   email: string;
@@ -28,8 +28,7 @@ interface UserRow {
 
 function mapRowToUser(row: UserRow): User {
   return {
-    id: row.sid,
-    sid: row.sid,
+    id: row.id,
     username: row.username,
     display_name: row.display_name,
     email: row.email,
@@ -54,7 +53,7 @@ export async function getUserProfile(userId: string): Promise<User | null> {
   try {
     debug(MODULE_NAME, `getUserProfile開始: userId=${userId}`);
     const db = getDatabase();
-    const row = db.prepare('SELECT * FROM users WHERE sid = ?').get(userId) as UserRow | undefined;
+    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow | undefined;
 
     if (!row) {
       debug(MODULE_NAME, `getUserProfile: ユーザーが見つかりませんでした: userId=${userId}`);
@@ -104,9 +103,8 @@ export async function getUserData(userId: string): Promise<User | null> {
  * ユーザーをDBに保存
  */
 function serializeUser(user: User) {
-  const sid = user.sid ?? user.id;
   return {
-    sid,
+    id: user.id,
     username: user.username,
     display_name: user.display_name,
     email: user.email,
@@ -131,13 +129,13 @@ async function saveUserToDatabase(user: User): Promise<void> {
     const serialized = serializeUser(user);
     const stmt = db.prepare(`
       INSERT INTO users (
-        sid, username, display_name, email, department_id, department, role, is_active,
+        id, username, display_name, email, department_id, department, role, is_active,
         created_date, last_login, avatar, bio, skills, certifications, mos
       ) VALUES (
-        @sid, @username, @display_name, @email, @department_id, @department, @role, @is_active,
+        @id, @username, @display_name, @email, @department_id, @department, @role, @is_active,
         @created_date, @last_login, @avatar, @bio, @skills, @certifications, @mos
       )
-      ON CONFLICT(sid) DO UPDATE SET
+      ON CONFLICT(id) DO UPDATE SET
         username = excluded.username,
         display_name = excluded.display_name,
         email = excluded.email,
@@ -163,13 +161,13 @@ async function saveUserToDatabase(user: User): Promise<void> {
       try {
         stmt.run(serialized);
         if (retryCount > 0) {
-          debug(MODULE_NAME, `ユーザー保存成功（リトライ ${retryCount}回後）: sid=${serialized.sid}`);
+          debug(MODULE_NAME, `ユーザー保存成功（リトライ ${retryCount}回後）: id=${serialized.id}`);
           // SQLITE_BUSYが発生したが最終的に成功した場合のログ
-          await logBusyError(serialized.sid, 'saveUserToDatabase', retryCount, true, {
-            targetSid: serialized.sid,
+          await logBusyError(serialized.id, 'saveUserToDatabase', retryCount, true, {
+            targetSid: serialized.id,
           });
         } else {
-          debug(MODULE_NAME, `ユーザー保存: sid=${serialized.sid}`);
+          debug(MODULE_NAME, `ユーザー保存: id=${serialized.id}`);
         }
         break;
       } catch (err: any) {
@@ -177,7 +175,7 @@ async function saveUserToDatabase(user: User): Promise<void> {
         if (err.code === 'SQLITE_BUSY' && retryCount < maxRetries - 1) {
           retryCount++;
           const waitTime = 50 * retryCount;
-          debug(MODULE_NAME, `SQLite書き込み競合検出（リトライ ${retryCount}回目）: sid=${user.sid}, ${waitTime}ms待機`);
+          debug(MODULE_NAME, `SQLite書き込み競合検出（リトライ ${retryCount}回目）: id=${user.id}, ${waitTime}ms待機`);
           await new Promise((resolve) => setTimeout(resolve, waitTime));
           continue;
         }
@@ -188,12 +186,12 @@ async function saveUserToDatabase(user: User): Promise<void> {
     if (retryCount >= maxRetries && lastError) {
       error(
         MODULE_NAME,
-        `ユーザー保存失敗（最大リトライ回数に達しました）: sid=${serialized.sid}`,
+        `ユーザー保存失敗（最大リトライ回数に達しました）: id=${serialized.id}`,
         lastError
       );
       // SQLITE_BUSYが発生して最終的に失敗した場合のログ
-      await logBusyError(serialized.sid, 'saveUserToDatabase', retryCount, false, {
-        targetSid: serialized.sid,
+      await logBusyError(serialized.id, 'saveUserToDatabase', retryCount, false, {
+        targetSid: serialized.id,
       });
       throw lastError;
     }
@@ -250,7 +248,6 @@ export async function updateUserData(userId: string, data: Partial<User>): Promi
       ...existingProfile,
       ...data,
       avatar: avatarPath || undefined,
-      sid: existingProfile.sid, // 旧フィールド互換
     };
 
     await saveUserToDatabase(updatedProfile);
@@ -328,7 +325,7 @@ export async function deleteUser(userId: string): Promise<boolean> {
     const db = getDatabase();
     
     // ユーザーを削除（CASCADEにより関連データも削除される）
-    const deleteStmt = db.prepare('DELETE FROM users WHERE sid = ?');
+    const deleteStmt = db.prepare('DELETE FROM users WHERE id = ?');
     const result = deleteStmt.run(userId);
     
     if (result.changes === 0) {

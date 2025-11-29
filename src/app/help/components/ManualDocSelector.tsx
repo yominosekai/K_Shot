@@ -1,18 +1,19 @@
 import Link from 'next/link';
-import { manualDocs } from '@/content/help/docs';
+import type { ManualDocDefinition } from '@/content/help/docs';
 
 interface ManualDocSelectorProps {
   activeDocId: string;
+  availableDocs: ManualDocDefinition[];
 }
 
-export default function ManualDocSelector({ activeDocId }: ManualDocSelectorProps) {
+export default function ManualDocSelector({ activeDocId, availableDocs }: ManualDocSelectorProps) {
   return (
     <div className="-mt-1">
       <div
         className="flex gap-3 overflow-x-auto rounded-2xl p-2 [&::-webkit-scrollbar]:hidden"
         style={{ scrollbarWidth: 'none' }}
       >
-        {manualDocs.map((doc) => {
+        {availableDocs.map((doc) => {
           const isActive = doc.id === activeDocId;
           return (
             <Link

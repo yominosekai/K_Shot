@@ -16,37 +16,37 @@ const MODULE_NAME = 'file-system/avatar';
 
 /**
  * アバター画像の保存パスを取得
- * @param userSid ユーザーSID
+ * @param userId ユーザーID
  * @returns アバター画像のフルパス
  */
 const AVATAR_FILE_NAME = 'avatar.png';
 
-export function getAvatarPath(userSid: string): string {
-  const userDir = getUserDirectoryPath(userSid);
+export function getAvatarPath(userId: string): string {
+  const userDir = getUserDirectoryPath(userId);
   return path.join(userDir, AVATAR_FILE_NAME);
 }
 
 /**
  * アバター画像の相対パスを取得（DB保存用）
- * @param userSid ユーザーSID
- * @returns 相対パス（例: "users/{SID}/avatar.png"）
+ * @param userId ユーザーID
+ * @returns 相対パス（例: "users/{USER_ID}/avatar.png"）
  */
-export function getAvatarRelativePath(userSid: string): string {
-  return getUserRelativePath(userSid, AVATAR_FILE_NAME);
+export function getAvatarRelativePath(userId: string): string {
+  return getUserRelativePath(userId, AVATAR_FILE_NAME);
 }
 
 /**
  * アバター画像を保存
- * @param userSid ユーザーSID
+ * @param userId ユーザーID
  * @param imageBuffer 画像のバッファ
  * @returns 保存されたファイルの相対パス
  */
 export async function saveAvatar(
-  userSid: string,
+  userId: string,
   imageBuffer: Buffer
 ): Promise<string> {
   try {
-    const avatarPath = getAvatarPath(userSid);
+    const avatarPath = getAvatarPath(userId);
     const userDir = path.dirname(avatarPath);
 
     // ユーザーディレクトリが存在しない場合は作成
@@ -65,20 +65,20 @@ export async function saveAvatar(
     await writeFile(avatarPath, imageBuffer);
     debug(MODULE_NAME, `アバター画像を保存: ${avatarPath}`);
 
-    return getAvatarRelativePath(userSid);
+    return getAvatarRelativePath(userId);
   } catch (err) {
-    error(MODULE_NAME, `アバター画像の保存に失敗: userSid=${userSid}`, err);
+    error(MODULE_NAME, `アバター画像の保存に失敗: userId=${userId}`, err);
     throw err;
   }
 }
 
 /**
  * アバター画像を削除
- * @param userSid ユーザーSID
+ * @param userId ユーザーID
  */
-export async function deleteAvatar(userSid: string): Promise<void> {
+export async function deleteAvatar(userId: string): Promise<void> {
   try {
-    const avatarPath = getAvatarPath(userSid);
+    const avatarPath = getAvatarPath(userId);
 
     if (existsSync(avatarPath)) {
       await unlink(avatarPath);
@@ -87,18 +87,18 @@ export async function deleteAvatar(userSid: string): Promise<void> {
       debug(MODULE_NAME, `アバター画像が存在しません: ${avatarPath}`);
     }
   } catch (err) {
-    error(MODULE_NAME, `アバター画像の削除に失敗: userSid=${userSid}`, err);
+    error(MODULE_NAME, `アバター画像の削除に失敗: userId=${userId}`, err);
     throw err;
   }
 }
 
 /**
  * アバター画像が存在するかチェック
- * @param userSid ユーザーSID
+ * @param userId ユーザーID
  * @returns 存在する場合true
  */
-export function avatarExists(userSid: string): boolean {
-  const avatarPath = getAvatarPath(userSid);
+export function avatarExists(userId: string): boolean {
+  const avatarPath = getAvatarPath(userId);
   return existsSync(avatarPath);
 }
 

@@ -19,7 +19,7 @@ export interface Material {
   estimated_hours?: string; // 推定学習時間（CSVでは文字列）
   tags: string; // CSVではカンマ区切り文字列
   folder_path: string; // フォルダパス（例: "セキュリティ基礎/2024年度/演習"）
-  created_by: string; // SID
+  created_by: string; // ユーザーID（UUID）
   created_date: string; // ISO 8601
   updated_date: string; // ISO 8601
   is_published: string; // CSVでは 'true'/'false' 文字列
@@ -158,7 +158,7 @@ export interface MaterialFilter {
   offset?: number;
   since?: string; // 差分更新用：この時刻以降に更新されたもののみ取得（ISO 8601形式）
   include_bookmark_counts?: boolean; // お気に入り数を含めるかどうか
-  user_sid?: string; // いいね状態を取得するユーザーSID
+  user_id?: string; // いいね状態を取得するユーザーID
 }
 
 /**
@@ -169,7 +169,7 @@ export interface Folder {
   name: string;
   parent_id: string; // 空文字列の場合はルート
   path: string; // フルパス（例: "セキュリティ基礎/2024年度"）
-  created_by: string; // SID
+  created_by: string; // ユーザーID（UUID）
   created_date: string; // ISO 8601
 }
 

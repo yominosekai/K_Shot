@@ -32,7 +32,7 @@ export default function Header() {
 
   // 通知ポーリング
   const { connectionStatus, fetchNotificationCount } = useNotificationPolling({
-    userSid: user?.sid,
+    userId: user?.id,
     onNotificationCountChange: (count) => {
       setUnreadNotificationCount(count);
     },
@@ -52,7 +52,7 @@ export default function Header() {
     handleMaterialClick: handleSearchMaterialClick,
     handleUserClick: handleSearchUserClick,
   } = useHeaderSearch({
-    userSid: user?.sid,
+    userId: user?.id,
     onMaterialClick: (material) => {
       setSelectedMaterial(material);
       setIsMaterialModalOpen(true);
@@ -65,10 +65,10 @@ export default function Header() {
 
   // 通知モーダルを開いた時に通知数を再取得
   useEffect(() => {
-    if (isNotificationModalOpen && user?.sid) {
+    if (isNotificationModalOpen && user?.id) {
       fetchNotificationCount();
     }
-  }, [isNotificationModalOpen, user?.sid]);
+  }, [isNotificationModalOpen, user?.id]);
 
   // 自動バックアップ（管理者のみ）
   useAutoBackup();

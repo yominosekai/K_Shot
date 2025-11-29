@@ -10,8 +10,8 @@ export type NotificationType = 'material_notification' | 'task_notification' | '
  */
 export interface Notification {
   id: string;
-  user_sid: string;
-  from_user_sid: string;
+  user_id: string;
+  from_user_id: string;
   material_id?: string;
   type: NotificationType;
   title: string;
@@ -26,8 +26,8 @@ export interface Notification {
  */
 export interface NotificationNormalized {
   id: string;
-  user_sid: string;
-  from_user_sid: string;
+  user_id: string;
+  from_user_id: string;
   from_user_name?: string; // 送信者名（結合後）
   material_id?: string;
   material_title?: string; // 資料タイトル（結合後）

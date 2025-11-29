@@ -6,7 +6,7 @@ import { getUserData } from '@/shared/lib/data-access/users';
 import { requireAdmin } from '@/shared/lib/auth/middleware';
 import { error, debug } from '@/shared/lib/logger';
 
-const MODULE_NAME = 'api/users/[sid]/device-tokens';
+const MODULE_NAME = 'api/users/[id]/device-tokens';
 
 interface DeviceTokenRecord {
   token: string;
@@ -17,12 +17,12 @@ interface DeviceTokenRecord {
 }
 
 /**
- * GET /api/users/[sid]/device-tokens
+ * GET /api/users/[id]/device-tokens
  * 指定ユーザーのデバイストークン一覧を取得（管理者のみ）
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 管理者権限チェック
@@ -31,11 +31,11 @@ export async function GET(
       return authResult.response;
     }
 
-    const { sid } = await params;
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = await params;
+    const decodedUserId = decodeURIComponent(id);
 
     // ユーザーが存在するか確認
-    const user = await getUserData(decodedSid);
+    const user = await getUserData(decodedUserId);
     if (!user) {
       return NextResponse.json(
         { success: false, error: 'ユーザーが見つかりません' },
@@ -52,11 +52,11 @@ export async function GET(
         last_used,
         status
        FROM device_tokens
-       WHERE user_sid = ?
+       WHERE user_id = ?
        ORDER BY issued_at DESC`
-    ).all(decodedSid) as DeviceTokenRecord[];
+    ).all(decodedUserId) as DeviceTokenRecord[];
 
-    debug(MODULE_NAME, `デバイストークン一覧取得: user_sid=${decodedSid}, count=${tokens.length}`);
+    debug(MODULE_NAME, `デバイストークン一覧取得: user_id=${decodedUserId}, count=${tokens.length}`);
 
     return NextResponse.json({
       success: true,
@@ -76,6 +76,4 @@ export async function GET(
     );
   }
 }
-
-
 

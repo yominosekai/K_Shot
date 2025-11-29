@@ -27,7 +27,7 @@ export async function handleGet(
     }
 
     const { searchParams } = new URL(request.url);
-    const user_sid = searchParams.get('user_sid'); // オプション: ユーザーSID
+    const user_id = searchParams.get('user_id'); // オプション: ユーザーID
 
     const material = await getMaterialDetail(materialId);
 
@@ -41,9 +41,9 @@ export async function handleGet(
       );
     }
 
-    // 閲覧数をカウント（ユーザーSIDが指定されている場合のみ、重複防止）
-    if (user_sid) {
-      await incrementMaterialView(materialId, user_sid);
+    // 閲覧数をカウント（ユーザーIDが指定されている場合のみ、重複防止）
+    if (user_id) {
+      await incrementMaterialView(materialId, user_id);
     }
 
     // 最新の閲覧数を取得（カウント後）

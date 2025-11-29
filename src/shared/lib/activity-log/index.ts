@@ -37,23 +37,23 @@ function isDriveUnavailableError(err: unknown): boolean {
   return DRIVE_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
 }
 
-function ensureUserLogsDir(userSid: string): string | null {
+function ensureUserLogsDir(userId: string): string | null {
   try {
-    const userDir = path.join(getUserDirectoryPath(userSid), 'logs');
+    const userDir = path.join(getUserDirectoryPath(userId), 'logs');
     if (!fs.existsSync(userDir)) {
       fs.mkdirSync(userDir, { recursive: true });
     }
     return userDir;
   } catch (err) {
     if (!isDriveUnavailableError(err)) {
-      error('activity-log', `Failed to prepare logs directory for userSid=${userSid}`, err);
+      error('activity-log', `Failed to prepare logs directory for userId=${userId}`, err);
     }
     return null;
   }
 }
 
-function appendActivityEntry(userSid: string, entry: ActivityLogEntry): void {
-  const userDir = ensureUserLogsDir(userSid);
+function appendActivityEntry(userId: string, entry: ActivityLogEntry): void {
+  const userDir = ensureUserLogsDir(userId);
   if (!userDir) {
     return;
   }
@@ -63,13 +63,13 @@ function appendActivityEntry(userSid: string, entry: ActivityLogEntry): void {
     fs.appendFileSync(logPath, line + '\n', { encoding: 'utf-8' });
   } catch (err) {
     if (!isDriveUnavailableError(err)) {
-      error('activity-log', `Failed to append activity entry for userSid=${userSid}`, err);
+      error('activity-log', `Failed to append activity entry for userId=${userId}`, err);
     }
   }
 }
 
-function readActivityState(userSid: string): ActivityState {
-  const userDir = ensureUserLogsDir(userSid);
+function readActivityState(userId: string): ActivityState {
+  const userDir = ensureUserLogsDir(userId);
   if (!userDir) {
     return {};
   }
@@ -82,14 +82,14 @@ function readActivityState(userSid: string): ActivityState {
     return JSON.parse(content) as ActivityState;
   } catch (err) {
     if (!isDriveUnavailableError(err)) {
-      error('activity-log', `Failed to read activity state for userSid=${userSid}`, err);
+      error('activity-log', `Failed to read activity state for userId=${userId}`, err);
     }
     return {};
   }
 }
 
-function writeActivityState(userSid: string, state: ActivityState): void {
-  const userDir = ensureUserLogsDir(userSid);
+function writeActivityState(userId: string, state: ActivityState): void {
+  const userDir = ensureUserLogsDir(userId);
   if (!userDir) {
     return;
   }
@@ -98,36 +98,36 @@ function writeActivityState(userSid: string, state: ActivityState): void {
     fs.writeFileSync(statePath, JSON.stringify(state), { encoding: 'utf-8' });
   } catch (err) {
     if (!isDriveUnavailableError(err)) {
-      error('activity-log', `Failed to write activity state for userSid=${userSid}`, err);
+      error('activity-log', `Failed to write activity state for userId=${userId}`, err);
     }
   }
 }
-export function recordLoginActivityEvent(userSid: string): void {
+export function recordLoginActivityEvent(userId: string): void {
   const today = getJSTTodayString();
-  const state = readActivityState(userSid);
+  const state = readActivityState(userId);
 
   if (state.lastLoginDate === today) {
     return;
   }
 
   const now = getJSTNowISOString();
-  appendActivityEntry(userSid, {
+  appendActivityEntry(userId, {
     eventType: 'login',
     timestamp: now,
     date: today,
   });
 
-  writeActivityState(userSid, {
+  writeActivityState(userId, {
     ...state,
     lastLoginDate: today,
   });
 }
 
-export function recordMaterialViewActivityEvent(userSid: string, materialId: string): void {
+export function recordMaterialViewActivityEvent(userId: string, materialId: string): void {
   const today = getJSTTodayString();
   const now = getJSTNowISOString();
 
-  appendActivityEntry(userSid, {
+  appendActivityEntry(userId, {
     eventType: 'material_view',
     timestamp: now,
     date: today,
@@ -138,19 +138,19 @@ export function recordMaterialViewActivityEvent(userSid: string, materialId: str
 }
 
 export function recordRolePasswordChangeActivityEvent(
-  userSid: string,
+  userId: string,
   role: 'admin' | 'instructor'
 ): void {
   const today = getJSTTodayString();
   const now = getJSTNowISOString();
 
-  appendActivityEntry(userSid, {
+  appendActivityEntry(userId, {
     eventType: 'role_password_change',
     timestamp: now,
     date: today,
     metadata: {
       role,
-      changedBy: userSid,
+      changedBy: userId,
     },
   });
 }

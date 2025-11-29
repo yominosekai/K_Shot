@@ -4,7 +4,7 @@ import { CheckCircle, XCircle, AlertCircle, Globe, Lock, Trash2, Reply, X } from
 
 interface Feedback {
   id: string;
-  user_sid: string;
+  user_id: string;
   content?: string;
   created_date: string;
   updated_date: string;
@@ -89,8 +89,8 @@ export default function FeedbackItem({
           ) : (
             <Lock className="w-4 h-4 text-gray-400" />
           )}
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {feedback.display_name || feedback.username || feedback.user_sid}
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+            {feedback.display_name || feedback.username || feedback.user_id}
           </span>
         </div>
         <div className="text-sm text-gray-500 dark:text-gray-400">

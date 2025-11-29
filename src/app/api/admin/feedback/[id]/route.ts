@@ -1,7 +1,7 @@
 // 管理者用フィードバックステータス更新・削除API
 
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateUser } from '@/features/auth/api/auth';
+import { requireAdmin } from '@/shared/lib/auth/middleware';
 import { getAllFeedbackMetadata, updateFeedbackStatus, updateFeedbackResponse, deleteFeedback } from '@/shared/lib/data-access/feedback';
 import { info, error, debug } from '@/shared/lib/logger';
 
@@ -16,29 +16,19 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authResult = await authenticateUser();
-    if (!authResult.success || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
-
-    // 管理者権限チェック
-    if (authResult.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: '管理者権限が必要です' },
-        { status: 403 }
-      );
+    // 認証・管理者権限チェック
+    const authResult = await requireAdmin();
+    if (!authResult.success) {
+      return authResult.response;
     }
 
     const { id: feedbackId } = await params;
     const body = await request.json();
     const { status, response } = body;
 
-    // メタデータからuser_sidを取得
+    // メタデータからuser_idを取得
     const metadata = getAllFeedbackMetadata();
-    const feedbackMeta = metadata.find(m => m.id === feedbackId);
+    const feedbackMeta = metadata.find((m) => m.id === feedbackId);
     
     if (!feedbackMeta) {
       return NextResponse.json(
@@ -56,7 +46,7 @@ export async function PATCH(
         );
       }
 
-      const success = await updateFeedbackStatus(feedbackId, feedbackMeta.user_sid, status);
+      const success = await updateFeedbackStatus(feedbackId, feedbackMeta.user_id, status);
       if (!success) {
         return NextResponse.json(
           { success: false, error: 'ステータスの更新に失敗しました' },
@@ -82,7 +72,7 @@ export async function PATCH(
         );
       }
 
-      const responderId = authResult.user.id ?? authResult.user.sid;
+      const responderId = authResult.user.id;
       if (!responderId) {
         return NextResponse.json(
           { success: false, error: '返事の更新者IDを特定できませんでした' },
@@ -92,7 +82,7 @@ export async function PATCH(
 
       const success = await updateFeedbackResponse(
         feedbackId,
-        feedbackMeta.user_sid,
+        feedbackMeta.user_id,
         response,
         responderId
       );
@@ -134,27 +124,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authResult = await authenticateUser();
-    if (!authResult.success || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
-
-    // 管理者権限チェック
-    if (authResult.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: '管理者権限が必要です' },
-        { status: 403 }
-      );
+    // 認証・管理者権限チェック
+    const authResult = await requireAdmin();
+    if (!authResult.success) {
+      return authResult.response;
     }
 
     const { id: feedbackId } = await params;
 
-    // メタデータからuser_sidを取得
+    // メタデータからuser_idを取得
     const metadata = getAllFeedbackMetadata();
-    const feedbackMeta = metadata.find(m => m.id === feedbackId);
+    const feedbackMeta = metadata.find((m) => m.id === feedbackId);
     
     if (!feedbackMeta) {
       return NextResponse.json(
@@ -163,7 +143,7 @@ export async function DELETE(
       );
     }
 
-    const success = await deleteFeedback(feedbackId, feedbackMeta.user_sid);
+    const success = await deleteFeedback(feedbackId, feedbackMeta.user_id);
 
     if (!success) {
       return NextResponse.json(

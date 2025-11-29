@@ -6,7 +6,7 @@ import type { User } from '@/features/auth/types';
 import { useUsers } from '@/contexts/UsersContext';
 
 interface UserAvatarProps {
-  sid?: string | null;
+  userId?: string | null;
   user?: User | null;
   name?: string | null;
   size?: number;
@@ -15,7 +15,7 @@ interface UserAvatarProps {
 }
 
 export function UserAvatar({
-  sid,
+  userId,
   user,
   name,
   size = 32,
@@ -27,42 +27,42 @@ export function UserAvatar({
 
   const resolvedUser = useMemo(() => {
     if (user) return user;
-    if (sid) {
-      return users.get(sid) || null;
+    if (userId) {
+      return users.get(userId) || null;
     }
     return null;
-  }, [sid, user, users]);
+  }, [userId, user, users]);
 
   useEffect(() => {
-    if (sid && !resolvedUser) {
-      getUser(sid).catch((err) => {
+    if (userId && !resolvedUser) {
+      getUser(userId).catch((err) => {
         console.error('[UserAvatar] ユーザー取得エラー:', err);
       });
     }
-  }, [sid, resolvedUser, getUser]);
+  }, [userId, resolvedUser, getUser]);
 
   const displayName =
     resolvedUser?.display_name ||
     resolvedUser?.username ||
     name ||
-    (sid ? sid.split('-').pop() : 'ユーザー');
+    (userId ? userId.split('-').pop() : 'ユーザー');
 
   const initial = displayName?.trim()?.charAt(0)?.toUpperCase() || 'U';
   
   // キャッシュバスター付きアバターURLを取得
   const avatarUrl = useMemo(() => {
-    if (!sid) return null;
+    if (!userId) return null;
     
     // UsersContextのgetAvatarUrlを使用（キャッシュとタイムスタンプ管理を一貫して行う）
-    return getAvatarUrl(sid);
-  }, [sid, getAvatarUrl]);
+    return getAvatarUrl(userId);
+  }, [userId, getAvatarUrl]);
 
   // avatarUrlやresolvedUserが変更されたときにimageErrorをリセット
   useEffect(() => {
     setImageError(false);
   }, [avatarUrl, resolvedUser]);
 
-  const hasAvatar = Boolean(!imageError && sid && (resolvedUser?.avatar || user?.avatar));
+  const hasAvatar = Boolean(!imageError && userId && (resolvedUser?.avatar || user?.avatar));
 
   const sizeStyle = { width: size, height: size };
 

@@ -15,14 +15,14 @@ interface NotificationFavorite {
 }
 
 interface NotificationFavoritesManagerProps {
-  userSid: string;
-  selectedUserSids: Set<string>;
-  onApplyFavorite: (userSids: string[]) => void;
+  userId: string;
+  selectedUserIds: Set<string>;
+  onApplyFavorite: (userIds: string[]) => void;
 }
 
 export default function NotificationFavoritesManager({
-  userSid,
-  selectedUserSids,
+  userId,
+  selectedUserIds,
   onApplyFavorite,
 }: NotificationFavoritesManagerProps) {
   const [favorites, setFavorites] = useState<NotificationFavorite[]>([]);
@@ -34,15 +34,15 @@ export default function NotificationFavoritesManager({
 
   // お気に入り一覧を取得
   useEffect(() => {
-    if (userSid) {
+    if (userId) {
       fetchFavorites();
     }
-  }, [userSid]);
+  }, [userId]);
 
   const fetchFavorites = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/users/${encodeURIComponent(userSid)}/notification-favorites`);
+      const response = await fetch(`/api/users/${encodeURIComponent(userId)}/notification-favorites`);
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -62,7 +62,7 @@ export default function NotificationFavoritesManager({
       return;
     }
 
-    if (selectedUserSids.size === 0) {
+    if (selectedUserIds.size === 0) {
       setError('ユーザーを選択してください');
       return;
     }
@@ -71,12 +71,12 @@ export default function NotificationFavoritesManager({
     setError(null);
 
     try {
-      const response = await fetch(`/api/users/${encodeURIComponent(userSid)}/notification-favorites`, {
+      const response = await fetch(`/api/users/${encodeURIComponent(userId)}/notification-favorites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: favoriteName.trim(),
-          userSids: Array.from(selectedUserSids),
+          userSids: Array.from(selectedUserIds),
         }),
       });
 
@@ -103,7 +103,7 @@ export default function NotificationFavoritesManager({
 
     try {
       const response = await fetch(
-        `/api/users/${encodeURIComponent(userSid)}/notification-favorites?id=${encodeURIComponent(favoriteId)}`,
+        `/api/users/${encodeURIComponent(userId)}/notification-favorites?id=${encodeURIComponent(favoriteId)}`,
         {
           method: 'DELETE',
         }
@@ -136,7 +136,7 @@ export default function NotificationFavoritesManager({
           type="button"
           onClick={() => setShowCreateModal(true)}
           className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center space-x-1"
-          disabled={selectedUserSids.size === 0}
+          disabled={selectedUserIds.size === 0}
         >
           <Plus className="w-4 h-4" />
           <span>新規作成</span>
@@ -212,7 +212,7 @@ export default function NotificationFavoritesManager({
 
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  選択中のユーザー: <span className="font-medium">{selectedUserSids.size}人</span>
+                  選択中のユーザー: <span className="font-medium">{selectedUserIds.size}人</span>
                 </p>
               </div>
 

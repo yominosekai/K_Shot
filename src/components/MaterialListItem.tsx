@@ -73,7 +73,7 @@ export default function MaterialListItem({
             {/* アバター */}
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold overflow-hidden ring-2 ring-gray-200 dark:ring-gray-700 flex-shrink-0">
               {(() => {
-                const creatorId = creator.id ?? creator.sid;
+                const creatorId = creator.id;
                 const avatarUrl = creatorId ? getAvatarUrl(creatorId) : null;
                 return avatarUrl ? (
                   <Image
@@ -89,14 +89,14 @@ export default function MaterialListItem({
                   />
                 ) : (
                   <span>
-                    {creator.display_name?.charAt(0).toUpperCase() || creator.sid?.charAt(0).toUpperCase() || 'U'}
+                    {creator.display_name?.charAt(0).toUpperCase() || 'U'}
                   </span>
                 );
               })()}
             </div>
             {/* 表示名 */}
             <p className="text-base text-gray-600 dark:text-gray-400 truncate">
-              {creator.display_name || creator.sid || '-'}
+              {creator.display_name || '-'}
             </p>
           </>
         ) : (

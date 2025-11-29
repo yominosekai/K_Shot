@@ -38,19 +38,19 @@ function getTokenSecret(): string {
 
 function signToken(payload: {
   token: string;
-  userSid: string;
+  userId: string;
   issuedAt: string;
   deviceLabel?: string;
 }): string {
   const secret = getTokenSecret();
   const hmac = crypto.createHmac('sha256', secret);
-  hmac.update(`${payload.token}:${payload.userSid}:${payload.issuedAt}:${payload.deviceLabel || ''}`);
+  hmac.update(`${payload.token}:${payload.userId}:${payload.issuedAt}:${payload.deviceLabel || ''}`);
   return hmac.digest('hex');
 }
 
 function verifyTokenSignature(tokenFile: {
   token: string;
-  user_sid: string;
+  user_id: string;
   issued_at: string;
   device_label?: string;
   signature: string;
@@ -58,7 +58,7 @@ function verifyTokenSignature(tokenFile: {
   try {
     const expected = signToken({
       token: tokenFile.token,
-      userSid: tokenFile.user_sid,
+      userId: tokenFile.user_id,
       issuedAt: tokenFile.issued_at,
       deviceLabel: tokenFile.device_label,
     });
@@ -94,7 +94,7 @@ async function verifyDeviceToken() {
     console.log('\n期待される署名を計算中...');
     const expectedSignature = signToken({
       token: tokenFile.token,
-      userSid: tokenFile.user_sid,
+      userId: tokenFile.user_id,
       issuedAt: tokenFile.issued_at,
       deviceLabel: tokenFile.device_label,
     });

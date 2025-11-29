@@ -8,15 +8,15 @@ import { requireAdmin } from '@/shared/lib/auth/middleware';
 import { signToken } from '@/shared/lib/auth/device-token';
 import { error, debug } from '@/shared/lib/logger';
 
-const MODULE_NAME = 'api/users/[sid]/device-tokens/reissue';
+const MODULE_NAME = 'api/users/[id]/device-tokens/reissue';
 
 /**
- * POST /api/users/[sid]/device-tokens/reissue
+ * POST /api/users/[id]/device-tokens/reissue
  * 指定ユーザーのデバイストークンを再発行（管理者のみ）
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 管理者権限チェック
@@ -25,11 +25,11 @@ export async function POST(
       return authResult.response;
     }
 
-    const { sid } = await params;
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = await params;
+    const decodedUserId = decodeURIComponent(id);
 
     // ユーザーが存在するか確認
-    const user = await getUserData(decodedSid);
+    const user = await getUserData(decodedUserId);
     if (!user) {
       return NextResponse.json(
         { success: false, error: 'ユーザーが見つかりません' },
@@ -50,9 +50,9 @@ export async function POST(
         db.prepare(
           `UPDATE device_tokens 
            SET status = 'revoked' 
-           WHERE user_sid = ? AND status = 'active'`
-        ).run(decodedSid);
-        debug(MODULE_NAME, `既存のアクティブトークンを失効させました: user_sid=${decodedSid}`);
+           WHERE user_id = ? AND status = 'active'`
+        ).run(decodedUserId);
+        debug(MODULE_NAME, `既存のアクティブトークンを失効させました: user_id=${decodedUserId}`);
       }
 
       // 新しいトークンを生成
@@ -60,7 +60,7 @@ export async function POST(
       const deviceLabel = device_label || `device-${randomUUID().slice(0, 6)}`;
       const signature = signToken({
         token: tokenValue,
-        userSid: decodedSid,
+        userId: decodedUserId,
         issuedAt: now,
         deviceLabel,
       });
@@ -70,7 +70,7 @@ export async function POST(
         `
         INSERT INTO device_tokens (
           token,
-          user_sid,
+          user_id,
           signature,
           device_label,
           issued_at,
@@ -79,14 +79,14 @@ export async function POST(
           signature_version
         ) VALUES (?, ?, ?, ?, ?, ?, 'active', 1)
         `
-      ).run(tokenValue, decodedSid, signature, deviceLabel, now, now);
+      ).run(tokenValue, decodedUserId, signature, deviceLabel, now, now);
 
       // device-token.jsonの内容を生成
       const deviceTokenFile = {
         schema_version: '1.0.0',
         token: tokenValue,
         signature,
-        user_sid: decodedSid,
+        user_id: decodedUserId,
         issued_at: now,
         device_label: deviceLabel,
         signature_version: 1,
@@ -97,7 +97,10 @@ export async function POST(
 
     const deviceTokenFile = transaction();
 
-    debug(MODULE_NAME, `デバイストークンを再発行しました: user_sid=${decodedSid}, token=${deviceTokenFile.token}`);
+    debug(
+      MODULE_NAME,
+      `デバイストークンを再発行しました: user_id=${decodedUserId}, token=${deviceTokenFile.token}`
+    );
 
     return NextResponse.json({
       success: true,
@@ -113,6 +116,4 @@ export async function POST(
     );
   }
 }
-
-
 

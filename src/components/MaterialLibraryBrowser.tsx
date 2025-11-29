@@ -110,7 +110,7 @@ export default function MaterialLibraryBrowser({
 
   // ハンドラー管理
   const handlers = useMaterialBrowserHandlers({
-    userSid: user?.sid,
+    userId: user?.id,
     onMaterialClick: modals.openMaterialModal,
     showToast: toast.showToast,
   });
@@ -139,7 +139,7 @@ export default function MaterialLibraryBrowser({
   // コンテキストメニュー管理
   const { handleContextMenu: createContextMenu } = useMaterialContextMenu({
     currentPath: currentPath || '',
-    userSid: user?.sid,
+    userId: user?.id,
     copyPath: (folder?: FolderNormalized, material?: MaterialNormalized) => copyPath(folder, material, toast.showToast),
     moveMaterialToTrash,
     moveFolderToTrash,

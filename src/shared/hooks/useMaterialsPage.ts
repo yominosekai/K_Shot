@@ -97,6 +97,7 @@ export function useMaterialsPage() {
     selectedFilter: filter.selectedFilter,
     setSelectedFilter: filter.setSelectedFilter,
     bookmarkedIds: bookmarks.bookmarkedIds,
+    bookmarks,
     creatorCache,
     setCreatorCache,
     fetchMaterialDetail: detail.fetchMaterialDetail,

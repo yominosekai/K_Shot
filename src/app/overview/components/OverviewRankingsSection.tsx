@@ -44,17 +44,17 @@ export default function OverviewRankingsSection({
       return;
     }
 
-    // 作成者のSIDを収集
-    const uniqueCreatorSids = new Set<string>();
+    // 作成者のユーザーIDを収集
+    const uniqueCreatorIds = new Set<string>();
     rankings.forEach((item) => {
       if (item.createdBy) {
-        uniqueCreatorSids.add(item.createdBy);
+        uniqueCreatorIds.add(item.createdBy);
       }
     });
 
     // ユーザー情報を一括取得（UsersContextのキャッシュを使用）
-    if (uniqueCreatorSids.size > 0) {
-      getUsersFromContext(Array.from(uniqueCreatorSids)).catch((err) => {
+    if (uniqueCreatorIds.size > 0) {
+      getUsersFromContext(Array.from(uniqueCreatorIds)).catch((err) => {
         console.error('[OverviewRankingsSection] 作成者情報一括取得エラー:', err);
       });
     }

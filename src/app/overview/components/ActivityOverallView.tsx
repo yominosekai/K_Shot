@@ -118,7 +118,7 @@ export default function ActivityOverallView({ data, onUserSelect }: ActivityOver
             </thead>
             <tbody>
               {userRankings.map((user, index) => (
-                <tr key={user.userSid} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <tr key={user.userId} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="py-3 px-2 text-sm font-medium text-gray-900 dark:text-gray-100">{index + 1}</td>
                   <td className="py-3 px-4 text-sm text-gray-900 dark:text-gray-100">{user.displayName}</td>
                   <td className="py-3 px-4 text-sm text-right text-gray-900 dark:text-gray-100 font-medium">{user.viewCount}回</td>

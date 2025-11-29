@@ -6,15 +6,15 @@ import { getUserData } from '@/shared/lib/data-access/users';
 import { requireAdmin } from '@/shared/lib/auth/middleware';
 import { error, debug } from '@/shared/lib/logger';
 
-const MODULE_NAME = 'api/users/[sid]/device-tokens/[token]';
+const MODULE_NAME = 'api/users/[id]/device-tokens/[token]';
 
 /**
- * DELETE /api/users/[sid]/device-tokens/[token]
+ * DELETE /api/users/[id]/device-tokens/[token]
  * 指定されたデバイストークンを失効させる（管理者のみ）
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string; token: string }> }
+  { params }: { params: Promise<{ id: string; token: string }> }
 ) {
   try {
     // 管理者権限チェック
@@ -23,12 +23,12 @@ export async function DELETE(
       return authResult.response;
     }
 
-    const { sid, token } = await params;
-    const decodedSid = decodeURIComponent(sid);
+    const { id, token } = await params;
+    const decodedUserId = decodeURIComponent(id);
     const decodedToken = decodeURIComponent(token);
 
     // ユーザーが存在するか確認
-    const user = await getUserData(decodedSid);
+    const user = await getUserData(decodedUserId);
     if (!user) {
       return NextResponse.json(
         { success: false, error: 'ユーザーが見つかりません' },
@@ -39,9 +39,9 @@ export async function DELETE(
     const db = getDatabase();
 
     // トークンが存在し、該当ユーザーに紐づいているか確認
-    const tokenRecord = db.prepare(
-      'SELECT token, status FROM device_tokens WHERE token = ? AND user_sid = ?'
-    ).get(decodedToken, decodedSid) as { token: string; status: string } | undefined;
+    const tokenRecord = db
+      .prepare('SELECT token, status FROM device_tokens WHERE token = ? AND user_id = ?')
+      .get(decodedToken, decodedUserId) as { token: string; status: string } | undefined;
 
     if (!tokenRecord) {
       return NextResponse.json(
@@ -62,7 +62,10 @@ export async function DELETE(
       'UPDATE device_tokens SET status = ? WHERE token = ?'
     ).run('revoked', decodedToken);
 
-    debug(MODULE_NAME, `デバイストークンを失効させました: token=${decodedToken}, user_sid=${decodedSid}`);
+    debug(
+      MODULE_NAME,
+      `デバイストークンを失効させました: token=${decodedToken}, user_id=${decodedUserId}`
+    );
 
     return NextResponse.json({
       success: true,
@@ -76,6 +79,4 @@ export async function DELETE(
     );
   }
 }
-
-
 

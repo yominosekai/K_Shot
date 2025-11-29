@@ -121,17 +121,17 @@ export default function MaterialModal({
   useEffect(() => {
     if (!isOpen || revisionHistory.length === 0 || !material?.created_by) return;
     // updated_byがnullの場合、material.created_byを使う
-    const sids = Array.from(
+    const userIds = Array.from(
       new Set(
         revisionHistory
           .map((rev) => rev.updated_by || material.created_by)
-          .filter((sid): sid is string => Boolean(sid) && !userCache.has(sid))
+          .filter((id): id is string => Boolean(id) && !userCache.has(id))
       )
     );
 
-    if (sids.length === 0) return;
+    if (userIds.length === 0) return;
 
-    getUsers(sids).catch((err) => {
+    getUsers(userIds).catch((err) => {
       console.error('履歴ユーザー一括取得エラー:', err);
     });
   }, [isOpen, revisionHistory, userCache, getUsers, material?.created_by]);

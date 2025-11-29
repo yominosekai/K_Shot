@@ -55,7 +55,7 @@ export default function UserListItem({ user, onClick, onContextMenu }: UserListI
         {/* アバター */}
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden ring-2 ring-gray-200 dark:ring-gray-700">
           {(() => {
-            const avatarSourceId = user.id ?? user.sid;
+            const avatarSourceId = user.id;
             const avatarUrl = avatarSourceId ? getAvatarUrl(avatarSourceId) : null;
             return avatarUrl ? (
               <Image

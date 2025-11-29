@@ -20,7 +20,9 @@ export function useHomePageModals() {
     try {
       const promptMessage =
         '資料が見つかりません、削除されたか移動された可能性があります。\n\n「検索しますか？」に対して「はい」を選択すると、ヘッダーの検索欄に検索キーワードが設定され、検索画面にフォーカスが移動します。';
-      const response = await fetch(`/api/materials/${materialId}${user?.sid ? `?user_sid=${user.sid}` : ''}`);
+      const response = await fetch(
+        `/api/materials/${materialId}${user?.id ? `?user_id=${user.id}` : ''}`
+      );
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.material) {
@@ -53,7 +55,7 @@ export function useHomePageModals() {
     } catch (err) {
       console.error('資料詳細取得エラー:', err);
     }
-  }, [user?.sid, setSearchValueAndFocus, confirmDialog]);
+  }, [user?.id, setSearchValueAndFocus, confirmDialog]);
 
   const closeModal = useCallback(() => {
     setIsMaterialModalOpen(false);

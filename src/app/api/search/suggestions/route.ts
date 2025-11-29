@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         folder_path: m.folder_path,
       })),
       users: matchedUsers.map((u) => ({
-        sid: u.sid,
+        id: u.id,
         display_name: u.display_name,
         username: u.username,
         email: u.email,

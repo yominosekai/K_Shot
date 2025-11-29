@@ -10,10 +10,10 @@ import { getDatabase } from '@/shared/lib/database/db';
 const MODULE_NAME = 'auth';
 
 /**
- * ローカル証明ファイルから現在のユーザー識別子を取得
- * @returns 識別子文字列、取得できない場合はnull
+ * ローカル証明ファイルから現在のユーザー識別子を取得（UUID）
+ * @returns ユーザーID文字列、取得できない場合はnull
  */
-export async function getCurrentUserSID(): Promise<string | null> {
+export async function getCurrentUserId(): Promise<string | null> {
   try {
     const token = readDeviceToken();
     if (!token) {
@@ -22,7 +22,7 @@ export async function getCurrentUserSID(): Promise<string | null> {
     }
 
     if (!verifyTokenSignature(token)) {
-      error(MODULE_NAME, 'getCurrentUserSID: デバイストークンの署名検証に失敗しました');
+      error(MODULE_NAME, 'getCurrentUserId: デバイストークンの署名検証に失敗しました');
       return null;
     }
 
@@ -38,13 +38,13 @@ export async function getCurrentUserSID(): Promise<string | null> {
     }
 
     if (tokenRecord.status === 'revoked') {
-      error(MODULE_NAME, 'getCurrentUserSID: デバイストークンは失効しています');
+      error(MODULE_NAME, 'getCurrentUserId: デバイストークンは失効しています');
       return null;
     }
 
-    return token.user_sid;
+    return token.user_id;
   } catch (err) {
-    console.error('[getCurrentUserSID] デバイストークン取得エラー:', err);
+    console.error('[getCurrentUserId] デバイストークン取得エラー:', err);
     return null;
   }
 }
@@ -56,9 +56,9 @@ export async function authenticateUser(): Promise<AuthResponse> {
   try {
     debug(MODULE_NAME, 'authenticateUser開始: リロード時の認証処理');
     // デバイストークンからユーザー識別子を取得
-    const sid = await getCurrentUserSID();
+    const userId = await getCurrentUserId();
 
-    if (!sid) {
+    if (!userId) {
       // デバイストークンがない場合は、セットアップ画面へのリダイレクトを促す
       return {
         success: false,
@@ -67,7 +67,7 @@ export async function authenticateUser(): Promise<AuthResponse> {
       };
     }
 
-    debug(MODULE_NAME, `authenticateUser: SID取得完了: ${sid}`);
+    debug(MODULE_NAME, `authenticateUser: ユーザーID取得完了: ${userId}`);
 
     // トークンの最終使用日時を更新
     try {
@@ -87,7 +87,7 @@ export async function authenticateUser(): Promise<AuthResponse> {
     // ユーザーデータを取得
     let user: User | null;
     try {
-      user = await getUserData(sid);
+      user = await getUserData(userId);
     } catch (err) {
       // ドライブ設定未完了のエラーはログ出力をスキップ（getDataDir()で既に出力済み）
       if (err instanceof Error && err.message.includes('ドライブ設定が完了していません')) {
@@ -109,7 +109,7 @@ export async function authenticateUser(): Promise<AuthResponse> {
     }
 
     debug(MODULE_NAME, `authenticateUser: ユーザーデータ取得完了`, {
-      sid,
+      userId,
       hasAvatar: !!user.avatar,
       avatarPath: user.avatar,
       displayName: user.display_name,
@@ -124,22 +124,25 @@ export async function authenticateUser(): Promise<AuthResponse> {
     // 今日のアクティビティを記録（1日1回のみ、非同期実行でレスポンス時間への影響を最小化）
     // エラーが発生しても次回に記録されるため、非同期実行でも問題なし
     Promise.resolve().then(() => {
-      recordUserActivity(sid);
-      recordLoginActivityEvent(sid);
+      recordUserActivity(userId);
+      recordLoginActivityEvent(userId);
     }).catch((err) => {
       // 非同期処理のエラーはログに記録するのみ（レスポンスには影響しない）
       error(MODULE_NAME, 'アクティビティ記録エラー（非同期）:', err);
     });
 
     if (timeDiff > oneHour) {
-      debug(MODULE_NAME, `authenticateUser: last_loginを更新します (${Math.round(timeDiff / 1000 / 60)}分経過)`);
-      const updatedUser = await updateUserData(sid, {
+      debug(
+        MODULE_NAME,
+        `authenticateUser: last_loginを更新します (${Math.round(timeDiff / 1000 / 60)}分経過)`
+      );
+      const updatedUser = await updateUserData(userId, {
         last_login: now.toISOString(),
       });
       // 更新後のデータを返す（avatarを含む）
       if (updatedUser) {
         debug(MODULE_NAME, 'authenticateUser完了: 認証成功（last_login更新後）', {
-          sid,
+          userId,
           hasAvatar: !!updatedUser.avatar,
           avatarPath: updatedUser.avatar,
         });
@@ -154,7 +157,7 @@ export async function authenticateUser(): Promise<AuthResponse> {
     }
 
     debug(MODULE_NAME, 'authenticateUser完了: 認証成功', {
-      sid,
+      userId,
       hasAvatar: !!user.avatar,
       avatarPath: user.avatar,
     });
@@ -173,9 +176,7 @@ export async function authenticateUser(): Promise<AuthResponse> {
   }
 }
 
-/**
- * 認証処理（POST - SID指定）
- */
+// 互換用エクスポート（旧名称）
 export async function authenticateUserWithSID(): Promise<AuthResponse> {
   return authenticateUser();
 }

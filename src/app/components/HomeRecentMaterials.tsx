@@ -91,7 +91,7 @@ export default function HomeRecentMaterials({
                       {creator ? (
                         <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold overflow-hidden ring-1 ring-gray-200 dark:ring-gray-700">
                           {(() => {
-                            const creatorId = creator.id ?? creator.sid;
+                            const creatorId = creator.id;
                             const avatarUrl = creatorId ? getAvatarUrl(creatorId) : null;
                             return avatarUrl ? (
                               <Image
@@ -107,7 +107,7 @@ export default function HomeRecentMaterials({
                               />
                             ) : (
                               <span>
-                                {creator.display_name?.charAt(0).toUpperCase() || creator.sid?.charAt(0).toUpperCase() || 'U'}
+                                {creator.display_name?.charAt(0).toUpperCase() || 'U'}
                               </span>
                             );
                           })()}
@@ -120,7 +120,7 @@ export default function HomeRecentMaterials({
                     {/* ユーザー名（可変幅） */}
                     <div>
                       <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                        {creator ? (creator.display_name || creator.sid) : (activity.created_by_name || activity.created_by)}
+                        {creator ? creator.display_name || activity.created_by : activity.created_by_name || activity.created_by}
                       </span>
                     </div>
                     

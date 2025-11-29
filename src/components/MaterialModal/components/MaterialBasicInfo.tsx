@@ -79,7 +79,7 @@ export default function MaterialBasicInfo({ material, creator }: MaterialBasicIn
               作成者:
             </span>
             <span className="text-gray-900 dark:text-gray-100">
-              {creator ? (creator.display_name || creator.sid) : (material.created_by_name || material.created_by || '-')}
+              {creator ? creator.display_name : material.created_by_name || material.created_by || '-'}
             </span>
           </div>
           <div className="flex items-center">

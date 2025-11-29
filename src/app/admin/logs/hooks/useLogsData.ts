@@ -38,7 +38,7 @@ export function useLogsData({
         params.append('type', logTypeFilter);
       }
       if (userFilter !== 'all') {
-        params.append('user_sid', userFilter);
+        params.append('user_id', userFilter);
       }
 
       const response = await fetch(`/api/admin/logs?${params.toString()}`);
@@ -72,8 +72,8 @@ export function useLogsData({
     // ユーザーフィルター
     if (userFilter !== 'all') {
       filtered = filtered.filter(log => {
-        const sid = log.user_sid || log.userSid;
-        return sid === userFilter;
+        const id = log.user_id || log.userId;
+        return id === userFilter;
       });
     }
 
@@ -124,8 +124,8 @@ export function useLogsData({
           bValue = new Date(b.timestamp || 0).getTime();
           break;
         case 'user':
-          aValue = a.userDisplayName || a.user_sid || a.userSid || '';
-          bValue = b.userDisplayName || b.user_sid || b.userSid || '';
+          aValue = a.userDisplayName || a.user_id || a.userId || '';
+          bValue = b.userDisplayName || b.user_id || b.userId || '';
           break;
         case 'module':
           aValue = a.module || a.operation || '';
@@ -158,16 +158,16 @@ export function useLogsData({
   const uniqueUsers = useMemo(() => {
     const userSet = new Set<string>();
     logs.forEach(log => {
-      const sid = log.user_sid || log.userSid;
-      if (sid) {
-        userSet.add(sid);
+      const id = log.user_id || log.userId;
+      if (id) {
+        userSet.add(id);
       }
     });
-    return Array.from(userSet).map(sid => {
-      const log = logs.find(l => (l.user_sid || l.userSid) === sid);
+    return Array.from(userSet).map(id => {
+      const log = logs.find(l => (l.user_id || l.userId) === id);
       return {
-        sid,
-        displayName: log?.userDisplayName || sid,
+        id,
+        displayName: log?.userDisplayName || id,
       };
     });
   }, [logs]);

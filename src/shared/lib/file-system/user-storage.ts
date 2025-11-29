@@ -13,7 +13,7 @@ export function getUsersRootPath(): string {
 }
 
 /**
- * ユーザーごとの保存用フォルダ名を生成（SIDをそのまま使わずハッシュ化）
+ * ユーザーごとの保存用フォルダ名を生成（ユーザーIDなどをそのまま使わずハッシュ化）
  */
 export function getUserDirectoryId(userKey: string | null | undefined): string {
   const key = userKey && userKey.trim().length > 0 ? userKey : DEFAULT_KEY;

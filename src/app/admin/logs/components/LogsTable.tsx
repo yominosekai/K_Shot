@@ -119,7 +119,7 @@ export default function LogsTable({
                     {formatDate(log.timestamp)}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                    {log.userDisplayName || log.user_sid || log.userSid || '不明'}
+                    {log.userDisplayName || log.user_id || log.userId || '不明'}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <span

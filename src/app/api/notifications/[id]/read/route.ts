@@ -17,16 +17,16 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { user_sid } = body;
+    const { user_id } = body;
 
-    if (!user_sid) {
+    if (!user_id) {
       return NextResponse.json(
         { success: false, error: 'ユーザー情報が取得できません' },
         { status: 400 }
       );
     }
 
-    const success = await markNotificationAsRead(id, user_sid);
+    const success = await markNotificationAsRead(id, user_id);
 
     if (!success) {
       return NextResponse.json(

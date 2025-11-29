@@ -14,17 +14,17 @@ const MODULE_NAME = 'api/notifications';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { user_sids, from_user_sid, material_id, title, message, type } = body;
+    const { user_ids, from_user_id, material_id, title, message, type } = body;
 
     // バリデーション
-    if (!user_sids || !Array.isArray(user_sids) || user_sids.length === 0) {
+    if (!user_ids || !Array.isArray(user_ids) || user_ids.length === 0) {
       return NextResponse.json(
         { success: false, error: '送信先ユーザーが指定されていません' },
         { status: 400 }
       );
     }
 
-    if (!from_user_sid) {
+    if (!from_user_id) {
       return NextResponse.json(
         { success: false, error: '送信者情報が取得できません' },
         { status: 400 }
@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
 
     // 通知を作成
     const successCount = await createNotificationsForUsers(
-      user_sids,
-      from_user_sid,
+      user_ids,
+      from_user_id,
       material_id || null,
       title,
       message,
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    debug(MODULE_NAME, `通知作成成功: ${successCount}/${user_sids.length}件, material_id=${material_id || 'なし'}`);
+    debug(MODULE_NAME, `通知作成成功: ${successCount}/${user_ids.length}件, material_id=${material_id || 'なし'}`);
 
     return NextResponse.json({
       success: true,

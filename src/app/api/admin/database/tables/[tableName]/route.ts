@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/shared/lib/database/db';
 import { getActivityAggregatorDb } from '@/shared/lib/activity-aggregator/local-db';
-import { authenticateUser } from '@/features/auth/api/auth';
+import { requireAdmin } from '@/shared/lib/auth/middleware';
 import { info, error, debug } from '@/shared/lib/logger';
 
 const MODULE_NAME = 'api/admin/database/tables/[tableName]';
@@ -17,21 +17,10 @@ export async function GET(
   { params }: { params: Promise<{ tableName: string }> }
 ) {
   try {
-    // 認証チェック
-    const authResult = await authenticateUser();
-    if (!authResult.success || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
-
-    // 管理者権限チェック
-    if (authResult.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: '管理者権限が必要です' },
-        { status: 403 }
-      );
+    // 認証・管理者権限チェック
+    const authResult = await requireAdmin();
+    if (!authResult.success) {
+      return authResult.response;
     }
 
     const { tableName } = await params;
@@ -122,21 +111,10 @@ export async function PUT(
   { params }: { params: Promise<{ tableName: string }> }
 ) {
   try {
-    // 認証チェック
-    const authResult = await authenticateUser();
-    if (!authResult.success || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
-
-    // 管理者権限チェック
-    if (authResult.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: '管理者権限が必要です' },
-        { status: 403 }
-      );
+    // 認証・管理者権限チェック
+    const authResult = await requireAdmin();
+    if (!authResult.success) {
+      return authResult.response;
     }
 
     const { tableName } = await params;
@@ -213,21 +191,10 @@ export async function DELETE(
   { params }: { params: Promise<{ tableName: string }> }
 ) {
   try {
-    // 認証チェック
-    const authResult = await authenticateUser();
-    if (!authResult.success || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
-
-    // 管理者権限チェック
-    if (authResult.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: '管理者権限が必要です' },
-        { status: 403 }
-      );
+    // 認証・管理者権限チェック
+    const authResult = await requireAdmin();
+    if (!authResult.success) {
+      return authResult.response;
     }
 
     const { tableName } = await params;

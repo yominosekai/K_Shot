@@ -1,7 +1,7 @@
 // 管理者用フィードバックAPI Routes
 
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateUser } from '@/features/auth/api/auth';
+import { requireAdmin } from '@/shared/lib/auth/middleware';
 import { getAllFeedbackMetadata, getFeedbackDetail } from '@/shared/lib/data-access/feedback';
 import { DRIVE_CONFIG } from '@/config/drive';
 import path from 'path';
@@ -16,20 +16,10 @@ const MODULE_NAME = 'api/admin/feedback';
  */
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await authenticateUser();
-    if (!authResult.success || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
-
-    // 管理者権限チェック
-    if (authResult.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: '管理者権限が必要です' },
-        { status: 403 }
-      );
+    // 認証・管理者権限チェック
+    const authResult = await requireAdmin();
+    if (!authResult.success) {
+      return authResult.response;
     }
 
     const { searchParams } = new URL(request.url);
@@ -53,7 +43,7 @@ export async function GET(request: NextRequest) {
     if (includeDetails) {
       const feedbacksWithDetails = await Promise.all(
         metadata.map(async (meta) => {
-          const detail = await getFeedbackDetail(meta.id, meta.user_sid);
+          const detail = await getFeedbackDetail(meta.id, meta.user_id);
           return {
             ...meta,
             content: detail?.content || '',

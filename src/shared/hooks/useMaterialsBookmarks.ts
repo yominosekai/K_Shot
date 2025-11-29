@@ -9,12 +9,12 @@ export function useMaterialsBookmarks() {
 
   // お気に入り一覧を取得
   const fetchBookmarks = useCallback(async () => {
-    if (!user?.sid) {
+    if (!user?.id) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/users/${user.sid}/bookmarks`);
+      const response = await fetch(`/api/users/${user.id}/bookmarks`);
       if (response.ok) {
         const data = await response.json();
         if (data.success && Array.isArray(data.bookmarks)) {
@@ -24,19 +24,19 @@ export function useMaterialsBookmarks() {
     } catch (err) {
       console.error('お気に入り取得エラー:', err);
     }
-  }, [user?.sid]);
+  }, [user?.id]);
 
-  // 初回読み込み時およびuser.sidが変更された時にお気に入りを取得
+  // 初回読み込み時およびuser.idが変更された時にお気に入りを取得
   useEffect(() => {
-    if (user?.sid) {
+    if (user?.id) {
       fetchBookmarks();
     }
-  }, [user?.sid, fetchBookmarks]); // user.sidとfetchBookmarksを依存配列に含める
+  }, [user?.id, fetchBookmarks]);
 
   // お気に入り切り替え（永続化）
   const handleBookmark = useCallback(
     async (materialId: string) => {
-      if (!user?.sid) {
+      if (!user?.id) {
         return;
       }
 
@@ -55,7 +55,7 @@ export function useMaterialsBookmarks() {
       try {
         if (isBookmarked) {
           // 削除
-          const response = await fetch(`/api/users/${user.sid}/bookmarks`, {
+          const response = await fetch(`/api/users/${user.id}/bookmarks`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ material_id: materialId }),
@@ -66,7 +66,7 @@ export function useMaterialsBookmarks() {
           }
         } else {
           // 追加
-          const response = await fetch(`/api/users/${user.sid}/bookmarks`, {
+          const response = await fetch(`/api/users/${user.id}/bookmarks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ material_id: materialId }),
@@ -82,7 +82,7 @@ export function useMaterialsBookmarks() {
         setBookmarkedIds(bookmarkedIds);
       }
     },
-    [user?.sid, bookmarkedIds]
+    [user?.id, bookmarkedIds]
   );
 
   return {

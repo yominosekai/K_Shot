@@ -2,7 +2,7 @@
 
 // ゴミ箱操作のカスタムフック
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, ReactNode } from 'react';
 import type { MaterialNormalized, FolderNormalized } from '@/features/materials/types';
 import type { User } from '@/features/auth/types';
 import { useConfirmDialog } from '@/contexts/ConfirmDialogContext';
@@ -27,14 +27,32 @@ export function useTrashOperation({
 
   const moveMaterialToTrash = useCallback(
     async (material: MaterialNormalized) => {
-      if (!user?.sid) {
+      if (!user?.id) {
         onError?.('ユーザー情報が取得できません');
         return;
       }
 
       const confirmed = await confirmDialog({
         title: '資料をゴミ箱に移動',
-        message: `資料「${material.title}」をゴミ箱に移動しますか？`,
+        message: (
+          <div className="space-y-2">
+            <p>資料「{material.title}」をゴミ箱に移動しますか？</p>
+            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">
+              以下の情報が削除されます：
+              </p>
+              <ul className="text-sm text-red-700 dark:text-red-300 space-y-1 list-disc list-inside">
+                <li>閲覧数</li>
+                <li>いいね</li>
+                <li>お気に入り</li>
+                <li>コメント</li>
+              </ul>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+              本当によろしいですか？
+            </p>
+          </div>
+        ),
         confirmText: '移動する',
         cancelText: 'キャンセル',
         variant: 'danger',
@@ -80,7 +98,7 @@ export function useTrashOperation({
             original_id: material.id,
             original_path: originalPath,
             original_name: material.title,
-            user_sid: user.sid,
+            user_id: user.id,
             original_folder_path: material.folder_path || '',
           }),
         });
@@ -113,14 +131,32 @@ export function useTrashOperation({
 
   const moveFolderToTrash = useCallback(
     async (folder: FolderNormalized) => {
-      if (!user?.sid) {
+      if (!user?.id) {
         onError?.('ユーザー情報が取得できません');
         return;
       }
 
       const confirmed = await confirmDialog({
         title: 'フォルダをゴミ箱に移動',
-        message: `フォルダ「${folder.name}」をゴミ箱に移動しますか？`,
+        message: (
+          <div className="space-y-2">
+            <p>フォルダ「{folder.name}」をゴミ箱に移動しますか？</p>
+            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">
+              フォルダ内の全資料に関する以下の情報が削除されます：
+              </p>
+              <ul className="text-sm text-red-700 dark:text-red-300 space-y-1 list-disc list-inside">
+                <li>閲覧数</li>
+                <li>いいね</li>
+                <li>お気に入り</li>
+                <li>コメント</li>
+              </ul>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+              本当によろしいですか？
+            </p>
+          </div>
+        ),
         confirmText: '移動する',
         cancelText: 'キャンセル',
         variant: 'danger',
@@ -140,7 +176,7 @@ export function useTrashOperation({
           original_id: folder.id,
           original_path: originalPath,
           original_name: folder.name,
-          user_sid: user.sid,
+          user_id: user.id,
           original_folder_path: folder.path || '',
         };
 

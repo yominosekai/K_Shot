@@ -41,7 +41,7 @@ const ROLE_LABELS: Record<UserType['role'], string> = {
   user: '一般ユーザー',
 };
 
-const getIdentifier = (user: Pick<UserType, 'id' | 'sid'>) => user.id || user.sid || '';
+const getIdentifier = (user: Pick<UserType, 'id'>) => user.id || '';
 
 const getDisplayInitial = (user: UserType) =>
   user.display_name?.charAt(0).toUpperCase() ||
@@ -90,7 +90,7 @@ function useAccountManagement(isOpen: boolean) {
     }
     const term = searchTerm.trim().toLowerCase();
     return users.filter((user) => {
-      const fields = [user.display_name, user.username, user.email, user.id, user.sid];
+      const fields = [user.display_name, user.username, user.email, user.id];
       return fields.some((field) => field?.toLowerCase().includes(term));
     });
   }, [searchTerm, users]);

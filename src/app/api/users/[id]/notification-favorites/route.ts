@@ -7,12 +7,12 @@ import { error, debug } from '@/shared/lib/logger';
 import fs from 'fs/promises';
 import path from 'path';
 
-const MODULE_NAME = 'api/users/[sid]/notification-favorites';
+const MODULE_NAME = 'api/users/[id]/notification-favorites';
 
 interface NotificationFavorite {
   id: string;
   name: string;
-  userSids: string[];
+  userIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -22,30 +22,30 @@ interface NotificationFavoritesFile {
 }
 
 /**
- * GET /api/users/[sid]/notification-favorites
+ * GET /api/users/[id]/notification-favorites
  * お気に入り一覧を取得
  */
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ sid: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const params = await context.params;
-    const { sid } = params;
-    // URLエンコードされたSIDをデコード
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = params;
+    // URLエンコードされたIDをデコード
+    const decodedId = decodeURIComponent(id);
 
-    if (!decodedSid) {
+    if (!decodedId) {
       return NextResponse.json(
         {
           success: false,
-          error: 'ユーザーSIDが指定されていません',
+          error: 'ユーザーIDが指定されていません',
         },
         { status: 400 }
       );
     }
 
-    const filePath = getUserSubPath(decodedSid, 'notification-favorites.json');
+    const filePath = getUserSubPath(decodedId, 'notification-favorites.json');
     const data: NotificationFavoritesFile | null = await readJSON(filePath);
 
     const favorites = data?.favorites || [];
@@ -69,31 +69,31 @@ export async function GET(
 }
 
 /**
- * POST /api/users/[sid]/notification-favorites
+ * POST /api/users/[id]/notification-favorites
  * お気に入りを追加
  */
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ sid: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const params = await context.params;
-    const { sid } = params;
-    // URLエンコードされたSIDをデコード
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = params;
+    // URLエンコードされたIDをデコード
+    const decodedId = decodeURIComponent(id);
 
-    if (!decodedSid) {
+    if (!decodedId) {
       return NextResponse.json(
         {
           success: false,
-          error: 'ユーザーSIDが指定されていません',
+          error: 'ユーザーIDが指定されていません',
         },
         { status: 400 }
       );
     }
 
     const body = await request.json();
-    const { name, userSids } = body;
+    const { name, userIds } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json(
@@ -105,7 +105,7 @@ export async function POST(
       );
     }
 
-    if (!userSids || !Array.isArray(userSids) || userSids.length === 0) {
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return NextResponse.json(
         {
           success: false,
@@ -115,7 +115,7 @@ export async function POST(
       );
     }
 
-    const filePath = getUserSubPath(decodedSid, 'notification-favorites.json');
+    const filePath = getUserSubPath(decodedId, 'notification-favorites.json');
     const data: NotificationFavoritesFile | null = await readJSON(filePath);
 
     const favorites = data?.favorites || [];
@@ -135,7 +135,7 @@ export async function POST(
     const newFavorite: NotificationFavorite = {
       id: `fav_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name: name.trim(),
-      userSids: userSids,
+      userIds,
       createdAt: now,
       updatedAt: now,
     };
@@ -152,7 +152,7 @@ export async function POST(
 
     await writeJSON(filePath, fileData);
 
-    debug(MODULE_NAME, `お気に入り追加: ${newFavorite.id}, sid=${decodedSid}`);
+    debug(MODULE_NAME, `お気に入り追加: ${newFavorite.id}, userId=${decodedId}`);
 
     return NextResponse.json({
       success: true,
@@ -171,24 +171,24 @@ export async function POST(
 }
 
 /**
- * DELETE /api/users/[sid]/notification-favorites
+ * DELETE /api/users/[id]/notification-favorites
  * お気に入りを削除
  */
 export async function DELETE(
   request: NextRequest,
-  context: { params: Promise<{ sid: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const params = await context.params;
-    const { sid } = params;
-    // URLエンコードされたSIDをデコード
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = params;
+    // URLエンコードされたIDをデコード
+    const decodedId = decodeURIComponent(id);
 
-    if (!decodedSid) {
+    if (!decodedId) {
       return NextResponse.json(
         {
           success: false,
-          error: 'ユーザーSIDが指定されていません',
+          error: 'ユーザーIDが指定されていません',
         },
         { status: 400 }
       );
@@ -207,7 +207,7 @@ export async function DELETE(
       );
     }
 
-    const filePath = getUserSubPath(decodedSid, 'notification-favorites.json');
+    const filePath = getUserSubPath(decodedId, 'notification-favorites.json');
     const data: NotificationFavoritesFile | null = await readJSON(filePath);
 
     if (!data || !data.favorites) {
@@ -238,7 +238,7 @@ export async function DELETE(
 
     await writeJSON(filePath, fileData);
 
-    debug(MODULE_NAME, `お気に入り削除: ${favoriteId}, sid=${decodedSid}`);
+    debug(MODULE_NAME, `お気に入り削除: ${favoriteId}, userId=${decodedId}`);
 
     return NextResponse.json({
       success: true,

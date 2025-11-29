@@ -36,7 +36,7 @@ export function useMaterialFormSubmit({
     async (e: React.FormEvent) => {
       e.preventDefault();
 
-      if (!user?.sid) {
+      if (!user?.id) {
         onError('ユーザー情報が取得できません');
         return;
       }
@@ -58,7 +58,7 @@ export function useMaterialFormSubmit({
         formDataToSend.append('tags', formData.tags);
         formDataToSend.append('content', formData.content);
         formDataToSend.append('folder_path', formData.folder_path || '');
-        formDataToSend.append('user_sid', user.sid);
+        formDataToSend.append('user_id', user.id);
 
         if (user.display_name) {
           formDataToSend.append('user_display_name', user.display_name);

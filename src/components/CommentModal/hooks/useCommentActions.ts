@@ -26,7 +26,7 @@ export function useCommentActions(
     links: any[],
     fileInputRef?: React.RefObject<HTMLInputElement | null>
   ) => {
-    if (!material || !user?.sid || !content.trim()) return;
+    if (!material || !user?.id || !content.trim()) return;
 
     try {
       setSubmitting(true);
@@ -60,7 +60,7 @@ export function useCommentActions(
       // コメントを作成
       const formData = new FormData();
       formData.append('content', content.trim());
-      formData.append('created_by', user.sid);
+      formData.append('created_by', user.id);
       formData.append('is_private', isPrivate.toString());
       if (parentCommentId) {
         formData.append('parent_comment_id', parentCommentId);
@@ -94,10 +94,10 @@ export function useCommentActions(
     } finally {
       setSubmitting(false);
     }
-  }, [material, user?.sid, onCommentAdded, refetchComments]);
+  }, [material, user?.id, onCommentAdded, refetchComments]);
 
   const handleEdit = useCallback(async (commentId: string) => {
-    if (!material || !user?.sid || !editContent.trim()) return;
+    if (!material || !user?.id || !editContent.trim()) return;
 
     try {
       setSubmitting(true);
@@ -111,7 +111,7 @@ export function useCommentActions(
           content: editContent.trim(),
           attachments: [],
           links: [],
-          user_sid: user.sid,
+          user_id: user.id,
         }),
       });
 
@@ -128,10 +128,10 @@ export function useCommentActions(
     } finally {
       setSubmitting(false);
     }
-  }, [material, user?.sid, editContent, refetchComments]);
+  }, [material, user?.id, editContent, refetchComments]);
 
   const handleDelete = useCallback(async (commentId: string) => {
-    if (!material || !user?.sid) return;
+    if (!material || !user?.id) return;
     const confirmed = await confirmDialog({
       title: 'コメント削除',
       message: 'このコメントを削除しますか？',
@@ -143,7 +143,7 @@ export function useCommentActions(
 
     try {
       const response = await fetch(
-        `/api/materials/${material.id}/comments?comment_id=${commentId}&user_sid=${user.sid}`,
+        `/api/materials/${material.id}/comments?comment_id=${commentId}&user_id=${user.id}`,
         {
           method: 'DELETE',
         }
@@ -161,7 +161,7 @@ export function useCommentActions(
     } catch (err) {
       console.error('コメント削除エラー:', err);
     }
-  }, [material, user?.sid, onCommentAdded, refetchComments, confirmDialog]);
+  }, [material, user?.id, onCommentAdded, refetchComments, confirmDialog]);
 
   return {
     submitting,

@@ -67,7 +67,7 @@ export function createTestDatabase(): Database.Database {
     );
     
     CREATE TABLE IF NOT EXISTS users (
-      sid TEXT PRIMARY KEY,
+      id TEXT PRIMARY KEY,
       username TEXT NOT NULL,
       display_name TEXT,
       email TEXT,

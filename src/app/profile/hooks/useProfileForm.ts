@@ -42,7 +42,7 @@ export function useProfileForm(user: User | null, isEditing: boolean) {
         mos: user.mos || [],
       });
       // アバターはキャッシュバスター付きURLを使用
-      const avatarSourceId = user.id ?? user.sid;
+      const avatarSourceId = user.id;
       if (user.avatar && avatarSourceId) {
         const avatarUrl = getAvatarUrl(avatarSourceId);
         setAvatarUrl(avatarUrl || '');
@@ -64,7 +64,7 @@ export function useProfileForm(user: User | null, isEditing: boolean) {
         mos: user.mos || [],
       });
       // アバターはキャッシュバスター付きURLを使用
-      const avatarSourceId = user.id ?? user.sid;
+      const avatarSourceId = user.id;
       if (user.avatar && avatarSourceId) {
         const avatarUrl = getAvatarUrl(avatarSourceId);
         setAvatarUrl(avatarUrl || '');

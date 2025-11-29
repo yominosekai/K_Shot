@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
         },
         provisioning: {
           action: 'REUSE_EXISTING_TOKEN',
-          userSid: deviceToken!.user_sid,
+          userId: deviceToken!.user_id,
         },
       });
     }
@@ -197,16 +197,16 @@ function inspectDeviceToken(
     }
 
     const tokenRecord = db
-      .prepare('SELECT user_sid, status FROM device_tokens WHERE token = ?')
-      .get(token.token) as { user_sid: string; status: string } | undefined;
+      .prepare('SELECT user_id, status FROM device_tokens WHERE token = ?')
+      .get(token.token) as { user_id: string; status: string } | undefined;
 
     if (!tokenRecord || tokenRecord.status !== 'active') {
       return { valid: false, userExists: false };
     }
 
     const userRecord = db
-      .prepare('SELECT sid FROM users WHERE sid = ?')
-      .get(tokenRecord.user_sid) as { sid: string } | undefined;
+      .prepare('SELECT id FROM users WHERE id = ?')
+      .get(tokenRecord.user_id) as { id: string } | undefined;
 
     return { valid: true, userExists: !!userRecord };
   } catch (error) {
@@ -218,14 +218,14 @@ function inspectDeviceToken(
 async function provisionUserAndToken(
   db: Database.Database,
   action: 'INITIAL_BOOTSTRAP' | 'NEW_DEVICE_USER'
-): Promise<{ userSid: string; deviceTokenFile: DeviceTokenFile }> {
-  const userSid = randomUUID();
+): Promise<{ userId: string; deviceTokenFile: DeviceTokenFile }> {
+  const userId = randomUUID();
   const username =
     action === 'INITIAL_BOOTSTRAP'
-      ? `admin_${userSid.slice(0, 8)}`
-      : `user_${userSid.slice(0, 8)}`;
+      ? `admin_${userId.slice(0, 8)}`
+      : `user_${userId.slice(0, 8)}`;
   const displayName =
-    action === 'INITIAL_BOOTSTRAP' ? `Admin ${userSid.slice(0, 6)}` : `User ${userSid.slice(0, 6)}`;
+    action === 'INITIAL_BOOTSTRAP' ? `Admin ${userId.slice(0, 6)}` : `User ${userId.slice(0, 6)}`;
   const email = `${username}@local`;
   const now = new Date().toISOString();
   const deviceLabel = `device-${randomUUID().slice(0, 6)}`;
@@ -233,7 +233,7 @@ async function provisionUserAndToken(
   db.prepare(
     `
       INSERT INTO users (
-        sid,
+        id,
         username,
         display_name,
         email,
@@ -244,12 +244,12 @@ async function provisionUserAndToken(
       )
       VALUES (?, ?, ?, ?, 'user', 1, ?, ?)
     `
-  ).run(userSid, username, displayName, email, now, now);
+  ).run(userId, username, displayName, email, now, now);
 
   const tokenValue = randomUUID();
   const signature = signToken({
     token: tokenValue,
-    userSid,
+    userId,
     issuedAt: now,
     deviceLabel,
   });
@@ -258,7 +258,7 @@ async function provisionUserAndToken(
     `
       INSERT INTO device_tokens (
         token,
-        user_sid,
+        user_id,
         signature,
         device_label,
         issued_at,
@@ -267,13 +267,13 @@ async function provisionUserAndToken(
         signature_version
       ) VALUES (?, ?, ?, ?, ?, ?, 'active', 1)
     `
-  ).run(tokenValue, userSid, signature, deviceLabel, now, now);
+  ).run(tokenValue, userId, signature, deviceLabel, now, now);
 
   const deviceTokenFile: DeviceTokenFile = {
     schema_version: '1.0.0',
     token: tokenValue,
     signature,
-    user_sid: userSid,
+    user_id: userId,
     issued_at: now,
     device_label: deviceLabel,
     signature_version: 1,
@@ -282,10 +282,10 @@ async function provisionUserAndToken(
   await writeDeviceToken(deviceTokenFile);
 
   console.log('[Save] 新しいユーザーとトークンを発行しました:', {
-    userSid,
+    userId,
     action,
   });
 
-  return { userSid, deviceTokenFile };
+  return { userId, deviceTokenFile };
 }
 

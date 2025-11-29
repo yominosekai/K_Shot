@@ -14,11 +14,11 @@ interface UsersContextType {
   users: Map<string, User>;
   loading: boolean;
   error: string | null;
-  getUser: (sid: string) => Promise<User | null>;
-  getUsers: (sids: string[]) => Promise<Map<string, User>>;
-  setUser: (sid: string, user: User) => void;
-  invalidateCache: (sid?: string, updateAvatarTimestamp?: boolean) => void;
-  getAvatarUrl: (sid: string) => string | null;
+  getUser: (userId: string) => Promise<User | null>;
+  getUsers: (userIds: string[]) => Promise<Map<string, User>>;
+  setUser: (userId: string, user: User) => void;
+  invalidateCache: (userId?: string, updateAvatarTimestamp?: boolean) => void;
+  getAvatarUrl: (userId: string) => string | null;
 }
 
 const UsersContext = createContext<UsersContextType | undefined>(undefined);
@@ -35,8 +35,6 @@ const defaultCachePayload: UsersCachePayload = {
   users: {},
   timestamps: {},
 };
-
-const isLegacyWindowsSid = (value: string): boolean => /^S-1-/.test(value);
 
 const now = () => Date.now();
 
@@ -56,12 +54,12 @@ function deserializeCache(): { users: Map<string, User>; timestamps: Map<string,
     const timestamps = new Map<string, number>();
     const current = now();
 
-    Object.entries(parsed.users).forEach(([sid, user]) => {
-      const timestamp = parsed.timestamps[sid];
+    Object.entries(parsed.users).forEach(([userId, user]) => {
+      const timestamp = parsed.timestamps[userId];
       if (!timestamp || current - timestamp < CACHE_DURATION) {
-        users.set(sid, user);
+        users.set(userId, user);
         if (timestamp) {
-          timestamps.set(sid, timestamp);
+          timestamps.set(userId, timestamp);
         }
       }
     });
@@ -79,11 +77,11 @@ function persistCache(users: Map<string, User>, timestamps: Map<string, number>)
   }
 
   const payload: UsersCachePayload = { users: {}, timestamps: {} };
-  users.forEach((user, sid) => {
-    payload.users[sid] = user;
+  users.forEach((user, userId) => {
+    payload.users[userId] = user;
   });
-  timestamps.forEach((timestamp, sid) => {
-    payload.timestamps[sid] = timestamp;
+  timestamps.forEach((timestamp, userId) => {
+    payload.timestamps[userId] = timestamp;
   });
 
   try {
@@ -119,33 +117,29 @@ export function UsersProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const setUserWithTimestamp = useCallback((sid: string, user: User, timestamp = now()) => {
+  const setUserWithTimestamp = useCallback((userId: string, user: User, timestamp = now()) => {
     setUsers((prev) => {
       const next = new Map(prev);
-      next.set(sid, user);
+      next.set(userId, user);
       return next;
     });
     setCacheTimestamps((prev) => {
       const next = new Map(prev);
-      next.set(sid, timestamp);
+      next.set(userId, timestamp);
       return next;
     });
   }, []);
 
   const getUser = useCallback(
-    async (sid: string): Promise<User | null> => {
-      if (!sid) {
+    async (userId: string): Promise<User | null> => {
+      if (!userId) {
         return null;
       }
 
-      const normalizedSid = sid.trim();
-      if (isLegacyWindowsSid(normalizedSid)) {
-        console.warn('[UsersContext] Ignoring legacy SID lookup:', normalizedSid);
-        return null;
-      }
+      const normalizedUserId = userId.trim();
 
-      const cached = users.get(normalizedSid);
-      const timestamp = cacheTimestamps.get(normalizedSid);
+      const cached = users.get(normalizedUserId);
+      const timestamp = cacheTimestamps.get(normalizedUserId);
       if (cached && isFresh(timestamp)) {
         return cached;
       }
@@ -154,7 +148,7 @@ export function UsersProvider({ children }: { children: ReactNode }) {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/users/${encodeURIComponent(normalizedSid)}`);
+        const response = await fetch(`/api/users/${encodeURIComponent(normalizedUserId)}`);
         if (!response.ok) {
           const errorMessage =
             response.status === 404 ? 'ユーザーが見つかりません' : 'ユーザー情報の取得に失敗しました';
@@ -168,7 +162,7 @@ export function UsersProvider({ children }: { children: ReactNode }) {
         }
 
         const fetchedUser = data.user as User;
-        setUserWithTimestamp(normalizedSid, fetchedUser);
+        setUserWithTimestamp(normalizedUserId, fetchedUser);
         return fetchedUser;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'ユーザー情報の取得に失敗しました';
@@ -184,40 +178,36 @@ export function UsersProvider({ children }: { children: ReactNode }) {
 
   // 複数のユーザー情報を一括取得
   const getUsers = useCallback(
-    async (sids: string[]): Promise<Map<string, User>> => {
+    async (userIds: string[]): Promise<Map<string, User>> => {
       const result = new Map<string, User>();
-      const uncachedSids: string[] = [];
+      const uncachedUserIds: string[] = [];
 
       // キャッシュから取得できるものを先に取得（refから最新の状態を取得）
       const now = Date.now();
-      sids.forEach((sid) => {
-        if (!sid) {
+      userIds.forEach((userId) => {
+        if (!userId) {
           return;
         }
-        const normalizedSid = sid.trim();
-        if (isLegacyWindowsSid(normalizedSid)) {
-          console.warn('[UsersContext] Skipping legacy SID in batch lookup:', normalizedSid);
-          return;
-        }
+        const normalizedUserId = userId.trim();
 
-        const cached = users.get(normalizedSid);
-        const timestamp = cacheTimestamps.get(normalizedSid);
+        const cached = users.get(normalizedUserId);
+        const timestamp = cacheTimestamps.get(normalizedUserId);
 
         if (cached && (!timestamp || now - timestamp < CACHE_DURATION)) {
-          result.set(normalizedSid, cached);
+          result.set(normalizedUserId, cached);
         } else {
-          uncachedSids.push(normalizedSid);
+          uncachedUserIds.push(normalizedUserId);
         }
       });
 
       // キャッシュにないものは並列で取得
-      if (uncachedSids.length > 0) {
-        const promises = uncachedSids.map((sid) => getUser(sid));
+      if (uncachedUserIds.length > 0) {
+        const promises = uncachedUserIds.map((id) => getUser(id));
         const results = await Promise.all(promises);
 
         results.forEach((user, index) => {
           if (user) {
-            result.set(uncachedSids[index], user);
+            result.set(uncachedUserIds[index], user);
           }
         });
       }
@@ -229,14 +219,13 @@ export function UsersProvider({ children }: { children: ReactNode }) {
 
   // ユーザー情報を直接設定（AuthContextから取得した情報を保存する場合など）
   const setUser = useCallback(
-    (sid: string, user: User) => {
-      if (!sid) return;
-      const normalizedSid = sid.trim();
-      if (isLegacyWindowsSid(normalizedSid)) return;
+    (userId: string, user: User) => {
+      if (!userId) return;
+      const normalizedUserId = userId.trim();
 
       setUsers((prev) => {
         const next = new Map(prev);
-        next.set(normalizedSid, user);
+        next.set(normalizedUserId, user);
         return next;
       });
     },
@@ -245,31 +234,37 @@ export function UsersProvider({ children }: { children: ReactNode }) {
 
   // キャッシュを無効化
   // updateAvatarTimestamp: trueの場合、アバター更新時のみタイムスタンプを更新（URLを変更してブラウザキャッシュを無効化）
+  // タイムスタンプは1時間後に自動削除され、固定URLに戻る
   const invalidateCache = useCallback(
-    (sid?: string, updateAvatarTimestamp: boolean = false) => {
-      if (sid) {
-        const normalizedSid = sid.trim();
-        if (isLegacyWindowsSid(normalizedSid)) {
-          return;
-        }
+    (userId?: string, updateAvatarTimestamp: boolean = false) => {
+      if (userId) {
+        const normalizedUserId = userId.trim();
 
         if (updateAvatarTimestamp) {
           setCacheTimestamps((prev) => {
             const next = new Map(prev);
-            next.set(normalizedSid, now());
+            next.set(normalizedUserId, now());
             return next;
           });
+          // 1時間後にタイムスタンプを自動削除（固定URLに戻す）
+          setTimeout(() => {
+            setCacheTimestamps((prev) => {
+              const next = new Map(prev);
+              next.delete(normalizedUserId);
+              return next;
+            });
+          }, CACHE_DURATION);
           return;
         }
 
         setUsers((prev) => {
           const next = new Map(prev);
-          next.delete(normalizedSid);
+          next.delete(normalizedUserId);
           return next;
         });
         setCacheTimestamps((prev) => {
           const next = new Map(prev);
-          next.delete(normalizedSid);
+          next.delete(normalizedUserId);
           return next;
         });
       } else {
@@ -284,15 +279,15 @@ export function UsersProvider({ children }: { children: ReactNode }) {
   // 通常時は固定URLを使用（ブラウザキャッシュを有効活用）
   // タイムスタンプがある場合のみキャッシュバスターとして使用（アバター更新時）
   const getAvatarUrl = useCallback(
-    (sid: string): string | null => {
-      const user = users.get(sid);
+    (userId: string): string | null => {
+      const user = users.get(userId);
       if (!user || !user.avatar) {
         return null;
       }
-      const timestamp = cacheTimestamps.get(sid);
+      const timestamp = cacheTimestamps.get(userId);
       return timestamp
-        ? `/api/users/${encodeURIComponent(sid)}/avatar?v=${timestamp}`
-        : `/api/users/${encodeURIComponent(sid)}/avatar`;
+        ? `/api/users/${encodeURIComponent(userId)}/avatar?v=${timestamp}`
+        : `/api/users/${encodeURIComponent(userId)}/avatar`;
     },
     [cacheTimestamps, users]
   );

@@ -42,8 +42,8 @@ export default function DeviceTokenManagementModal({
     try {
       setLoading(true);
       setError(null);
-      const encodedSid = encodeURIComponent(user.sid || user.id || '');
-      const response = await fetch(`/api/users/${encodedSid}/device-tokens`);
+      const encodedId = encodeURIComponent(user.id || '');
+      const response = await fetch(`/api/users/${encodedId}/device-tokens`);
       const data = await response.json();
 
       if (data.success) {
@@ -82,8 +82,8 @@ export default function DeviceTokenManagementModal({
     try {
       setReissuing(true);
       setError(null);
-      const encodedSid = encodeURIComponent(user.sid || user.id || '');
-      const response = await fetch(`/api/users/${encodedSid}/device-tokens/reissue`, {
+      const encodedId = encodeURIComponent(user.id || '');
+      const response = await fetch(`/api/users/${encodedId}/device-tokens/reissue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -147,9 +147,9 @@ export default function DeviceTokenManagementModal({
     try {
       setRevokingToken(token);
       setError(null);
-      const encodedSid = encodeURIComponent(user.sid || user.id || '');
+      const encodedId = encodeURIComponent(user.id || '');
       const encodedToken = encodeURIComponent(token);
-      const response = await fetch(`/api/users/${encodedSid}/device-tokens/${encodedToken}`, {
+      const response = await fetch(`/api/users/${encodedId}/device-tokens/${encodedToken}`, {
         method: 'DELETE',
       });
 
@@ -175,8 +175,8 @@ export default function DeviceTokenManagementModal({
     if (!user) return;
 
     try {
-      const encodedSid = encodeURIComponent(user.sid || user.id || '');
-      const response = await fetch(`/api/users/${encodedSid}/device-tokens/download?token=${encodeURIComponent(token)}`);
+      const encodedId = encodeURIComponent(user.id || '');
+      const response = await fetch(`/api/users/${encodedId}/device-tokens/download?token=${encodeURIComponent(token)}`);
 
       if (response.ok) {
         const blob = await response.blob();

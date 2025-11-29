@@ -55,7 +55,7 @@ export async function handlePut(
     const estimated_hours = formData.get('estimated_hours') as string;
     const tags = (formData.get('tags') as string) || (existingMaterial.tags?.join(',') || '');
     const content = (formData.get('content') as string) || existingMaterial.document || '';
-    const userSid = formData.get('user_sid') as string;
+    const userId = formData.get('user_id') as string;
     const userDisplayName = (formData.get('user_display_name') as string) || '';
     const revisionReason = (formData.get('revision_reason') as string) || '';
     const folderPath = (formData.get('folder_path') as string) || existingMaterial.folder_path || '';
@@ -68,7 +68,7 @@ export async function handlePut(
       );
     }
 
-    if (!userSid) {
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: 'ユーザー情報が取得できません' },
         { status: 401 }
@@ -148,7 +148,7 @@ export async function handlePut(
 
     // SQLiteを更新（リトライ処理付き）
     const now = new Date().toISOString();
-    await updateMaterialInDatabase(materialId, userSid, {
+    await updateMaterialInDatabase(materialId, userId, {
       title,
       description: description || null,
       category_id: category_id || null,
@@ -163,7 +163,7 @@ export async function handlePut(
     // 更新後の資料を取得
     await addMaterialRevision({
       materialId,
-      updatedBy: userSid,
+      updatedBy: userId,
       updatedByName: userDisplayName || undefined,
       comment: revisionReason || undefined,
     });

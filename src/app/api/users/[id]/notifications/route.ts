@@ -4,32 +4,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserNotifications, getUnreadNotificationCount } from '@/shared/lib/data-access/notifications';
 import { info, error } from '@/shared/lib/logger';
 
-const MODULE_NAME = 'api/users/[sid]/notifications';
+const MODULE_NAME = 'api/users/[id]/notifications';
 
 /**
- * GET /api/users/[sid]/notifications
+ * GET /api/users/[id]/notifications
  * ユーザーの通知一覧を取得
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { sid } = await params;
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const unreadOnly = searchParams.get('unread_only') === 'true';
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
     // URLデコード
-    let decodedSid: string;
+    let decodedId: string;
     try {
-      decodedSid = decodeURIComponent(sid);
+      decodedId = decodeURIComponent(id);
     } catch {
-      decodedSid = sid;
+      decodedId = id;
     }
 
-    const notifications = await getUserNotifications(decodedSid, unreadOnly, limit);
-    const unreadCount = getUnreadNotificationCount(decodedSid);
+    const notifications = await getUserNotifications(decodedId, unreadOnly, limit);
+    const unreadCount = getUnreadNotificationCount(decodedId);
 
     return NextResponse.json({
       success: true,

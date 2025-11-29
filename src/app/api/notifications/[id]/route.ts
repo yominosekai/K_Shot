@@ -17,16 +17,16 @@ export async function DELETE(
   try {
     const { id } = await params;
     const { searchParams } = new URL(request.url);
-    const userSid = searchParams.get('user_sid');
+    const userId = searchParams.get('user_id');
 
-    if (!userSid) {
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: 'ユーザー情報が取得できません' },
         { status: 400 }
       );
     }
 
-    const success = await deleteNotification(id, userSid);
+    const success = await deleteNotification(id, userId);
 
     if (!success) {
       return NextResponse.json(

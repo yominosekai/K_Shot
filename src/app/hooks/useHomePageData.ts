@@ -51,19 +51,19 @@ export function useHomePageData() {
           setRecentMaterials(data.activities || []);
           
           // 作成者情報を一括取得
-          const uniqueCreatorSids = new Set<string>();
+          const uniqueCreatorIds = new Set<string>();
           data.activities.forEach((activity: RecentMaterialActivity) => {
             if (activity.created_by) {
-              uniqueCreatorSids.add(activity.created_by);
+              uniqueCreatorIds.add(activity.created_by);
             }
           });
 
           // 各作成者情報を取得（UsersContextを使用）
-          const creatorResults = await getUsersFromContext(Array.from(uniqueCreatorSids));
+          const creatorResults = await getUsersFromContext(Array.from(uniqueCreatorIds));
           const newCache = new Map<string, UserType>();
-          creatorResults.forEach((user, sid) => {
+          creatorResults.forEach((user, userId) => {
             if (user) {
-              newCache.set(sid, user);
+              newCache.set(userId, user);
             }
           });
           setCreatorCache(newCache);

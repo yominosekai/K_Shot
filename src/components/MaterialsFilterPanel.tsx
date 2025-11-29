@@ -14,7 +14,7 @@ interface MaterialType {
 }
 
 interface User {
-  sid: string;
+  id: string;
   display_name: string;
   username: string;
 }
@@ -167,7 +167,7 @@ export default function MaterialsFilterPanel({
               >
                 <option value="">すべて</option>
                 {creators.map((creator) => (
-                  <option key={creator.sid} value={creator.sid}>
+                  <option key={creator.id} value={creator.id}>
                     {creator.display_name || creator.username}
                   </option>
                 ))}

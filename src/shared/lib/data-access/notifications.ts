@@ -10,8 +10,8 @@ const MODULE_NAME = 'notifications';
  * 通知を作成
  */
 export async function createNotification(
-  userSid: string,
-  fromUserSid: string,
+  userId: string,
+  fromUserId: string,
   materialId: string | null,
   title: string,
   message: string,
@@ -24,19 +24,19 @@ export async function createNotification(
 
     const insert = db.prepare(`
       INSERT INTO notifications (
-        id, user_sid, from_user_sid, material_id, type, title, message, is_read, created_date
+        id, user_id, from_user_id, material_id, type, title, message, is_read, created_date
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
     `);
 
-    insert.run(notificationId, userSid, fromUserSid, materialId || null, type, title, message, createdDate);
+    insert.run(notificationId, userId, fromUserId, materialId || null, type, title, message, createdDate);
 
-    debug(MODULE_NAME, `通知作成: id=${notificationId}, user_sid=${userSid}, from_user_sid=${fromUserSid}`);
+    debug(MODULE_NAME, `通知作成: id=${notificationId}, user_id=${userId}, from_user_id=${fromUserId}`);
 
     return {
       id: notificationId,
-      user_sid: userSid,
-      from_user_sid: fromUserSid,
+      user_id: userId,
+      from_user_id: fromUserId,
       material_id: materialId || undefined,
       type: type as any,
       title,
@@ -54,8 +54,8 @@ export async function createNotification(
  * 複数のユーザーに通知を作成（一括）
  */
 export async function createNotificationsForUsers(
-  userSids: string[],
-  fromUserSid: string,
+  userIds: string[],
+  fromUserId: string,
   materialId: string | null,
   title: string,
   message: string,
@@ -67,23 +67,23 @@ export async function createNotificationsForUsers(
 
     const insert = db.prepare(`
       INSERT INTO notifications (
-        id, user_sid, from_user_sid, material_id, type, title, message, is_read, created_date
+        id, user_id, from_user_id, material_id, type, title, message, is_read, created_date
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
     `);
 
     let successCount = 0;
-    for (const userSid of userSids) {
+    for (const userId of userIds) {
       try {
         const notificationId = `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        insert.run(notificationId, userSid, fromUserSid, materialId || null, type, title, message, createdDate);
+        insert.run(notificationId, userId, fromUserId, materialId || null, type, title, message, createdDate);
         successCount++;
       } catch (err) {
-        error(MODULE_NAME, `通知作成エラー（個別）: user_sid=${userSid}`, err);
+        error(MODULE_NAME, `通知作成エラー（個別）: user_id=${userId}`, err);
       }
     }
 
-    debug(MODULE_NAME, `一括通知作成完了: ${successCount}/${userSids.length}件成功`);
+    debug(MODULE_NAME, `一括通知作成完了: ${successCount}/${userIds.length}件成功`);
     return successCount;
   } catch (err) {
     error(MODULE_NAME, '一括通知作成エラー:', err);
@@ -95,7 +95,7 @@ export async function createNotificationsForUsers(
  * ユーザーの通知一覧を取得
  */
 export async function getUserNotifications(
-  userSid: string,
+  userId: string,
   unreadOnly: boolean = false,
   limit: number = 50
 ): Promise<NotificationNormalized[]> {
@@ -109,12 +109,12 @@ export async function getUserNotifications(
         m.title as material_title,
         m.folder_path as material_folder_path
       FROM notifications n
-      LEFT JOIN users u_from ON n.from_user_sid = u_from.sid
+      LEFT JOIN users u_from ON n.from_user_id = u_from.id
       LEFT JOIN materials m ON n.material_id = m.id
-      WHERE n.user_sid = ?
+      WHERE n.user_id = ?
     `;
 
-    const params: any[] = [userSid];
+    const params: any[] = [userId];
 
     if (unreadOnly) {
       query += ' AND n.is_read = 0';
@@ -128,8 +128,8 @@ export async function getUserNotifications(
 
     return rows.map((row) => ({
       id: row.id,
-      user_sid: row.user_sid,
-      from_user_sid: row.from_user_sid,
+      user_id: row.user_id,
+      from_user_id: row.from_user_id,
       from_user_name: row.from_user_name || undefined,
       material_id: row.material_id || undefined,
       material_title: row.material_title || undefined,
@@ -142,7 +142,7 @@ export async function getUserNotifications(
       read_date: row.read_date || undefined,
     }));
   } catch (err) {
-    error(MODULE_NAME, `通知取得エラー: user_sid=${userSid}`, err);
+    error(MODULE_NAME, `通知取得エラー: user_id=${userId}`, err);
     return [];
   }
 }
@@ -150,22 +150,22 @@ export async function getUserNotifications(
 /**
  * ユーザーの未読通知数を取得
  */
-export function getUnreadNotificationCount(userSid: string): number {
+export function getUnreadNotificationCount(userId: string): number {
   try {
     const db = getDatabase();
     const stmt = db.prepare(`
       SELECT COUNT(*) as count
       FROM notifications
-      WHERE user_sid = ? AND is_read = 0
+      WHERE user_id = ? AND is_read = 0
     `);
-    const result = stmt.get(userSid) as { count: number } | undefined;
+    const result = stmt.get(userId) as { count: number } | undefined;
     return result?.count || 0;
   } catch (err) {
     // ドライブ設定未完了のエラーはログ出力をスキップ（getDataDir()で既に出力済み）
     if (err instanceof Error && err.message.includes('ドライブ設定が完了していません')) {
       return 0;
     }
-    error(MODULE_NAME, `未読通知数取得エラー: user_sid=${userSid}`, err);
+    error(MODULE_NAME, `未読通知数取得エラー: user_id=${userId}`, err);
     return 0;
   }
 }
@@ -173,7 +173,7 @@ export function getUnreadNotificationCount(userSid: string): number {
 /**
  * 通知を既読にする
  */
-export async function markNotificationAsRead(notificationId: string, userSid: string): Promise<boolean> {
+export async function markNotificationAsRead(notificationId: string, userId: string): Promise<boolean> {
   try {
     const db = getDatabase();
     const readDate = new Date().toISOString();
@@ -181,13 +181,13 @@ export async function markNotificationAsRead(notificationId: string, userSid: st
     const update = db.prepare(`
       UPDATE notifications
       SET is_read = 1, read_date = ?
-      WHERE id = ? AND user_sid = ?
+      WHERE id = ? AND user_id = ?
     `);
 
-    const result = update.run(readDate, notificationId, userSid);
+    const result = update.run(readDate, notificationId, userId);
 
     if (result.changes > 0) {
-      debug(MODULE_NAME, `通知を既読に: id=${notificationId}, user_sid=${userSid}`);
+      debug(MODULE_NAME, `通知を既読に: id=${notificationId}, user_id=${userId}`);
       return true;
     }
 
@@ -201,7 +201,7 @@ export async function markNotificationAsRead(notificationId: string, userSid: st
 /**
  * すべての通知を既読にする
  */
-export async function markAllNotificationsAsRead(userSid: string): Promise<boolean> {
+export async function markAllNotificationsAsRead(userId: string): Promise<boolean> {
   try {
     const db = getDatabase();
     const readDate = new Date().toISOString();
@@ -209,15 +209,15 @@ export async function markAllNotificationsAsRead(userSid: string): Promise<boole
     const update = db.prepare(`
       UPDATE notifications
       SET is_read = 1, read_date = ?
-      WHERE user_sid = ? AND is_read = 0
+      WHERE user_id = ? AND is_read = 0
     `);
 
-    const result = update.run(readDate, userSid);
+    const result = update.run(readDate, userId);
 
-    debug(MODULE_NAME, `すべての通知を既読に: user_sid=${userSid}, ${result.changes}件`);
+    debug(MODULE_NAME, `すべての通知を既読に: user_id=${userId}, ${result.changes}件`);
     return true;
   } catch (err) {
-    error(MODULE_NAME, `全通知既読エラー: user_sid=${userSid}`, err);
+    error(MODULE_NAME, `全通知既読エラー: user_id=${userId}`, err);
     return false;
   }
 }
@@ -225,20 +225,20 @@ export async function markAllNotificationsAsRead(userSid: string): Promise<boole
 /**
  * 通知を未読に戻す
  */
-export async function markNotificationAsUnread(notificationId: string, userSid: string): Promise<boolean> {
+export async function markNotificationAsUnread(notificationId: string, userId: string): Promise<boolean> {
   try {
     const db = getDatabase();
 
     const update = db.prepare(`
       UPDATE notifications
       SET is_read = 0, read_date = NULL
-      WHERE id = ? AND user_sid = ?
+      WHERE id = ? AND user_id = ?
     `);
 
-    const result = update.run(notificationId, userSid);
+    const result = update.run(notificationId, userId);
 
     if (result.changes > 0) {
-      debug(MODULE_NAME, `通知を未読に戻す: id=${notificationId}, user_sid=${userSid}`);
+      debug(MODULE_NAME, `通知を未読に戻す: id=${notificationId}, user_id=${userId}`);
       return true;
     }
 
@@ -252,19 +252,19 @@ export async function markNotificationAsUnread(notificationId: string, userSid: 
 /**
  * 通知を削除（個別）
  */
-export async function deleteNotification(notificationId: string, userSid: string): Promise<boolean> {
+export async function deleteNotification(notificationId: string, userId: string): Promise<boolean> {
   try {
     const db = getDatabase();
 
     const deleteStmt = db.prepare(`
       DELETE FROM notifications
-      WHERE id = ? AND user_sid = ?
+      WHERE id = ? AND user_id = ?
     `);
 
-    const result = deleteStmt.run(notificationId, userSid);
+    const result = deleteStmt.run(notificationId, userId);
 
     if (result.changes > 0) {
-      debug(MODULE_NAME, `通知を削除: id=${notificationId}, user_sid=${userSid}`);
+      debug(MODULE_NAME, `通知を削除: id=${notificationId}, user_id=${userId}`);
       return true;
     }
 
@@ -278,21 +278,21 @@ export async function deleteNotification(notificationId: string, userSid: string
 /**
  * すべての通知を削除
  */
-export async function deleteAllNotifications(userSid: string): Promise<number> {
+export async function deleteAllNotifications(userId: string): Promise<number> {
   try {
     const db = getDatabase();
 
     const deleteStmt = db.prepare(`
       DELETE FROM notifications
-      WHERE user_sid = ?
+      WHERE user_id = ?
     `);
 
-    const result = deleteStmt.run(userSid);
+    const result = deleteStmt.run(userId);
 
-    debug(MODULE_NAME, `すべての通知を削除: user_sid=${userSid}, ${result.changes}件`);
+    debug(MODULE_NAME, `すべての通知を削除: user_id=${userId}, ${result.changes}件`);
     return result.changes;
   } catch (err) {
-    error(MODULE_NAME, `全通知削除エラー: user_sid=${userSid}`, err);
+    error(MODULE_NAME, `全通知削除エラー: user_id=${userId}`, err);
     return 0;
   }
 }

@@ -1,26 +1,17 @@
 // 入力検証ユーティリティ
 
-import { validateSID } from '@/features/auth/utils';
-
 /**
- * SIDの検証
- * @param sid 検証するSID
- * @returns 有効なSIDの場合はtrue、それ以外はfalse
- */
-export function isValidSID(sid: string): boolean {
-  if (!sid || typeof sid !== 'string') {
-    return false;
-  }
-  return validateSID(sid);
-}
-
-/**
- * ユーザーIDの検証（SIDと同じ形式）
+ * ユーザーID（UUIDなど）の検証
  * @param userId 検証するユーザーID
  * @returns 有効なユーザーIDの場合はtrue、それ以外はfalse
  */
 export function isValidUserId(userId: string): boolean {
-  return isValidSID(userId);
+  if (!userId || typeof userId !== 'string') {
+    return false;
+  }
+  // 簡易UUID v4 形式チェック（ハイフン区切りの16進数）
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidPattern.test(userId);
 }
 
 /**

@@ -63,7 +63,7 @@ export default function HeaderUserMenu({ user, onRoleChangeClick }: HeaderUserMe
       >
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold overflow-hidden ring-2 ring-gray-200 dark:ring-gray-700">
           {(() => {
-            const avatarUrl = user?.sid ? getAvatarUrl(user.sid) : null;
+            const avatarUrl = user?.id ? getAvatarUrl(user.id) : null;
             return avatarUrl ? (
               <Image
                 src={avatarUrl}

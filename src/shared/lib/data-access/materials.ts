@@ -188,11 +188,11 @@ export async function getMaterials(filter?: MaterialFilter): Promise<MaterialNor
       }
     }
 
-    // いいね状態を一括取得（user_sidが指定されている場合）
-    if (normalized.length > 0 && filter?.user_sid) {
+    // いいね状態を一括取得（user_idが指定されている場合）
+    if (normalized.length > 0 && filter?.user_id) {
       try {
         const materialIds = normalized.map(m => m.id);
-        const likeStatuses = getLikeStatuses(materialIds, filter.user_sid);
+        const likeStatuses = getLikeStatuses(materialIds, filter.user_id);
         
         // いいね状態を追加
         normalized.forEach(material => {

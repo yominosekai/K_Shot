@@ -20,9 +20,9 @@ export async function GET(
   try {
     const { id: materialId } = await params;
     const searchParams = request.nextUrl.searchParams;
-    const currentUserSid = searchParams.get('user_sid');
+    const currentUserId = searchParams.get('user_id');
 
-    if (!currentUserSid) {
+    if (!currentUserId) {
       return NextResponse.json(
         { success: false, error: 'ユーザー情報が取得できません' },
         { status: 401 }
@@ -38,7 +38,7 @@ export async function GET(
       );
     }
 
-    const comments = await getMaterialComments(materialId, currentUserSid, material.created_by || '');
+    const comments = await getMaterialComments(materialId, currentUserId, material.created_by || '');
 
     return NextResponse.json({
       success: true,
@@ -242,7 +242,7 @@ export async function PUT(
     const content = body.content as string;
     const attachments = (body.attachments || []) as CommentAttachment[];
     const links = (body.links || []) as CommentLink[];
-    const currentUserSid = body.user_sid as string;
+    const currentUserId = body.user_id as string;
 
     // バリデーション
     if (!commentId || !content || !content.trim()) {
@@ -252,7 +252,7 @@ export async function PUT(
       );
     }
 
-    if (!currentUserSid) {
+    if (!currentUserId) {
       return NextResponse.json(
         { success: false, error: 'ユーザー情報が取得できません' },
         { status: 401 }
@@ -271,7 +271,7 @@ export async function PUT(
       );
     }
 
-    if (comment.created_by !== currentUserSid) {
+    if (comment.created_by !== currentUserId) {
       return NextResponse.json(
         { success: false, error: 'このコメントを編集する権限がありません' },
         { status: 403 }
@@ -313,7 +313,7 @@ export async function DELETE(
     const { id: materialId } = await params;
     const searchParams = request.nextUrl.searchParams;
     const commentId = searchParams.get('comment_id');
-    const currentUserSid = searchParams.get('user_sid');
+    const currentUserId = searchParams.get('user_id');
 
     if (!commentId) {
       return NextResponse.json(
@@ -322,7 +322,7 @@ export async function DELETE(
       );
     }
 
-    if (!currentUserSid) {
+    if (!currentUserId) {
       return NextResponse.json(
         { success: false, error: 'ユーザー情報が取得できません' },
         { status: 401 }
@@ -341,7 +341,7 @@ export async function DELETE(
       );
     }
 
-    if (comment.created_by !== currentUserSid) {
+    if (comment.created_by !== currentUserId) {
       return NextResponse.json(
         { success: false, error: 'このコメントを削除する権限がありません' },
         { status: 403 }

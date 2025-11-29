@@ -20,7 +20,7 @@ function initializeSchema(db: Database.Database): void {
     PRAGMA foreign_keys = ON;
 
     CREATE TABLE IF NOT EXISTS processed_logs (
-      user_sid TEXT PRIMARY KEY,
+      user_id TEXT PRIMARY KEY,
       log_path TEXT NOT NULL,
       last_offset INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL
@@ -28,8 +28,8 @@ function initializeSchema(db: Database.Database): void {
 
     CREATE TABLE IF NOT EXISTS login_events (
       date TEXT NOT NULL,
-      user_sid TEXT NOT NULL,
-      PRIMARY KEY (date, user_sid)
+      user_id TEXT NOT NULL,
+      PRIMARY KEY (date, user_id)
     );
 
     CREATE TABLE IF NOT EXISTS material_view_daily (

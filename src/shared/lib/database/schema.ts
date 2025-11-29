@@ -54,20 +54,20 @@ const TABLE_STATEMENTS: Statement[] = [
     comment TEXT,
     updated_date TEXT NOT NULL,
     FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
-    FOREIGN KEY (updated_by) REFERENCES users(sid) ON DELETE SET NULL
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
   );`,
   `CREATE TABLE IF NOT EXISTS material_likes (
     material_id TEXT NOT NULL,
-    user_sid TEXT NOT NULL,
+    user_id TEXT NOT NULL,
     created_date TEXT NOT NULL,
-    PRIMARY KEY (material_id, user_sid),
+    PRIMARY KEY (material_id, user_id),
     FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE
   );`,
   `CREATE TABLE IF NOT EXISTS material_views (
     material_id TEXT NOT NULL,
-    user_sid TEXT NOT NULL,
+    user_id TEXT NOT NULL,
     view_date TEXT NOT NULL,
-    PRIMARY KEY (material_id, user_sid, view_date),
+    PRIMARY KEY (material_id, user_id, view_date),
     FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE
   );`,
   `CREATE TABLE IF NOT EXISTS departments (
@@ -77,7 +77,7 @@ const TABLE_STATEMENTS: Statement[] = [
     created_date TEXT NOT NULL
   );`,
   `CREATE TABLE IF NOT EXISTS users (
-    sid TEXT PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     username TEXT NOT NULL,
     display_name TEXT NOT NULL,
     email TEXT NOT NULL,
@@ -95,14 +95,14 @@ const TABLE_STATEMENTS: Statement[] = [
   );`,
   `CREATE TABLE IF NOT EXISTS device_tokens (
     token TEXT PRIMARY KEY,
-    user_sid TEXT NOT NULL,
+    user_id TEXT NOT NULL,
     signature TEXT NOT NULL,
     device_label TEXT,
     issued_at TEXT NOT NULL,
     last_used TEXT,
     status TEXT NOT NULL DEFAULT 'active',
     signature_version INTEGER DEFAULT 1,
-    FOREIGN KEY (user_sid) REFERENCES users(sid) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );`,
   `CREATE TABLE IF NOT EXISTS system_config (
     key TEXT PRIMARY KEY,
@@ -126,8 +126,8 @@ const TABLE_STATEMENTS: Statement[] = [
   );`,
   `CREATE TABLE IF NOT EXISTS notifications (
     id TEXT PRIMARY KEY,
-    user_sid TEXT NOT NULL,
-    from_user_sid TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    from_user_id TEXT NOT NULL,
     material_id TEXT,
     type TEXT NOT NULL DEFAULT 'material_notification',
     title TEXT NOT NULL,
@@ -135,8 +135,8 @@ const TABLE_STATEMENTS: Statement[] = [
     is_read INTEGER DEFAULT 0,
     created_date TEXT NOT NULL,
     read_date TEXT,
-    FOREIGN KEY (user_sid) REFERENCES users(sid) ON DELETE CASCADE,
-    FOREIGN KEY (from_user_sid) REFERENCES users(sid) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE
   );`,
   `CREATE TABLE IF NOT EXISTS material_comments (
@@ -152,18 +152,18 @@ const TABLE_STATEMENTS: Statement[] = [
     updated_date TEXT NOT NULL,
     FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
     FOREIGN KEY (parent_comment_id) REFERENCES material_comments(id) ON DELETE CASCADE,
-    FOREIGN KEY (created_by) REFERENCES users(sid) ON DELETE CASCADE
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
   );`,
   `CREATE TABLE IF NOT EXISTS user_activities (
     date TEXT NOT NULL,
-    user_sid TEXT NOT NULL,
+    user_id TEXT NOT NULL,
     created_date TEXT NOT NULL,
-    PRIMARY KEY (date, user_sid),
-    FOREIGN KEY (user_sid) REFERENCES users(sid) ON DELETE CASCADE
+    PRIMARY KEY (date, user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );`,
   `CREATE TABLE IF NOT EXISTS feedback_metadata (
     id TEXT PRIMARY KEY,
-    user_sid TEXT NOT NULL,
+    user_id TEXT NOT NULL,
     created_date TEXT NOT NULL,
     updated_date TEXT NOT NULL,
     is_public INTEGER DEFAULT 0,
@@ -171,7 +171,7 @@ const TABLE_STATEMENTS: Statement[] = [
     has_response INTEGER DEFAULT 0,
     response_date TEXT,
     response_by TEXT,
-    FOREIGN KEY (user_sid) REFERENCES users(sid) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );`
 ];
 
@@ -186,13 +186,13 @@ const INDEX_STATEMENTS: Statement[] = [
   'CREATE INDEX IF NOT EXISTS idx_folders_path ON folders(path);',
   'CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);',
   'CREATE INDEX IF NOT EXISTS idx_material_likes_material_id ON material_likes(material_id);',
-  'CREATE INDEX IF NOT EXISTS idx_material_likes_user_sid ON material_likes(user_sid);',
+  'CREATE INDEX IF NOT EXISTS idx_material_likes_user_id ON material_likes(user_id);',
   'CREATE INDEX IF NOT EXISTS idx_material_views_material_id ON material_views(material_id);',
-  'CREATE INDEX IF NOT EXISTS idx_material_views_user_sid ON material_views(user_sid);',
+  'CREATE INDEX IF NOT EXISTS idx_material_views_user_id ON material_views(user_id);',
   'CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);',
   'CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active);',
   'CREATE INDEX IF NOT EXISTS idx_users_created_date ON users(created_date);',
-  'CREATE INDEX IF NOT EXISTS idx_notifications_user_sid ON notifications(user_sid);',
+  'CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);',
   'CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);',
   'CREATE INDEX IF NOT EXISTS idx_notifications_created_date ON notifications(created_date);',
   'CREATE INDEX IF NOT EXISTS idx_material_types_sort_order ON material_types(sort_order);',
@@ -202,10 +202,10 @@ const INDEX_STATEMENTS: Statement[] = [
   'CREATE INDEX IF NOT EXISTS idx_material_comments_created_by ON material_comments(created_by);',
   'CREATE INDEX IF NOT EXISTS idx_material_comments_is_private ON material_comments(is_private);',
   'CREATE INDEX IF NOT EXISTS idx_user_activities_date ON user_activities(date);',
-  'CREATE INDEX IF NOT EXISTS idx_user_activities_user_sid ON user_activities(user_sid);',
+  'CREATE INDEX IF NOT EXISTS idx_user_activities_user_id ON user_activities(user_id);',
   'CREATE INDEX IF NOT EXISTS idx_departments_name ON departments(name);',
-  'CREATE INDEX IF NOT EXISTS idx_device_tokens_user_sid ON device_tokens(user_sid);',
-  'CREATE INDEX IF NOT EXISTS idx_feedback_metadata_user_sid ON feedback_metadata(user_sid);',
+  'CREATE INDEX IF NOT EXISTS idx_device_tokens_user_id ON device_tokens(user_id);',
+  'CREATE INDEX IF NOT EXISTS idx_feedback_metadata_user_id ON feedback_metadata(user_id);',
   'CREATE INDEX IF NOT EXISTS idx_feedback_metadata_created_date ON feedback_metadata(created_date);',
   'CREATE INDEX IF NOT EXISTS idx_feedback_metadata_status ON feedback_metadata(status);'
 ];
@@ -430,7 +430,7 @@ function migrateMaterialRevisions(db: SqliteDatabase): void {
         comment TEXT,
         updated_date TEXT NOT NULL,
         FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
-        FOREIGN KEY (updated_by) REFERENCES users(sid) ON DELETE SET NULL
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
       );
       INSERT INTO material_revisions SELECT * FROM material_revisions_temp;
       DROP TABLE material_revisions_temp;

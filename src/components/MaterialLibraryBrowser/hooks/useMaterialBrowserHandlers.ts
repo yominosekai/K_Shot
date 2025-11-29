@@ -5,13 +5,13 @@ import type { MaterialNormalized } from '@/features/materials/types';
 import { downloadMaterialAsZip } from '@/shared/lib/utils/material-download';
 
 interface UseMaterialBrowserHandlersProps {
-  userSid?: string;
+  userId?: string;
   onMaterialClick: (material: MaterialNormalized) => void;
   showToast: (message: string) => void;
 }
 
 export function useMaterialBrowserHandlers({
-  userSid,
+  userId,
   onMaterialClick,
   showToast,
 }: UseMaterialBrowserHandlersProps) {
@@ -19,9 +19,9 @@ export function useMaterialBrowserHandlers({
   const handleMaterialClick = useCallback(
     async (material: MaterialNormalized) => {
       try {
-        // 閲覧数カウント用にuser_sidをクエリパラメータとして渡す
-        const url = userSid
-          ? `/api/materials/${material.id}?user_sid=${userSid}`
+        // 閲覧数カウント用にuser_idをクエリパラメータとして渡す
+        const url = userId
+          ? `/api/materials/${material.id}?user_id=${userId}`
           : `/api/materials/${material.id}`;
         const response = await fetch(url);
         if (response.ok) {
@@ -36,7 +36,7 @@ export function useMaterialBrowserHandlers({
       }
       onMaterialClick(material);
     },
-    [userSid, onMaterialClick]
+    [userId, onMaterialClick]
   );
 
   // ダウンロード処理

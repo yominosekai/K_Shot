@@ -12,7 +12,7 @@ interface Feedback {
   created_date: string;
   updated_date: string;
   status: 'open' | 'resolved' | 'closed';
-  user_sid?: string;
+  user_id?: string;
   username?: string;
   display_name?: string;
   response?: {
@@ -267,7 +267,7 @@ export default function FeedbackPage() {
                         <Lock className="w-4 h-4 text-gray-400" />
                       )}
                       {/* 投稿者名を表示（自分の投稿でない場合） */}
-                      {feedback.user_sid && feedback.user_sid !== user?.sid && (
+                      {feedback.user_id && feedback.user_id !== user?.id && (
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           {feedback.display_name || feedback.username || '不明なユーザー'}
                         </span>

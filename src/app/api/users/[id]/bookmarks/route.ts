@@ -6,21 +6,21 @@ import { error, debug } from '@/shared/lib/logger';
 import { getUserSubPath } from '@/shared/lib/file-system/user-storage';
 import path from 'path';
 
-const MODULE_NAME = 'api/users/[sid]/bookmarks';
+const MODULE_NAME = 'api/users/[id]/bookmarks';
 
 /**
- * GET /api/users/[sid]/bookmarks
+ * GET /api/users/[id]/bookmarks
  * ユーザーのお気に入り一覧を取得
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { sid } = await params;
-    // URLエンコードされたSIDをデコード
-    const decodedSid = decodeURIComponent(sid);
-    const bookmarksPath = getUserSubPath(decodedSid, 'bookmarks.json');
+    const { id } = await params;
+    // URLエンコードされたIDをデコード
+    const decodedId = decodeURIComponent(id);
+    const bookmarksPath = getUserSubPath(decodedId, 'bookmarks.json');
 
     const bookmarks = await readJSON(bookmarksPath);
 
@@ -54,17 +54,17 @@ export async function GET(
 }
 
 /**
- * POST /api/users/[sid]/bookmarks
+ * POST /api/users/[id]/bookmarks
  * お気に入りを追加
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { sid } = await params;
-    // URLエンコードされたSIDをデコード
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = await params;
+    // URLエンコードされたIDをデコード
+    const decodedId = decodeURIComponent(id);
     const body = await request.json();
     const { material_id } = body;
 
@@ -75,7 +75,7 @@ export async function POST(
       );
     }
 
-    const bookmarksPath = getUserSubPath(decodedSid, 'bookmarks.json');
+    const bookmarksPath = getUserSubPath(decodedId, 'bookmarks.json');
 
     // 既存のお気に入りを読み込む
     let bookmarks: string[] = [];
@@ -108,7 +108,7 @@ export async function POST(
     // 保存
     await writeJSON(bookmarksPath, bookmarks);
 
-    debug(MODULE_NAME, `お気に入り追加: sid=${decodedSid}, material_id=${material_id}`);
+    debug(MODULE_NAME, `お気に入り追加: userId=${decodedId}, material_id=${material_id}`);
 
     return NextResponse.json({
       success: true,
@@ -125,17 +125,17 @@ export async function POST(
 }
 
 /**
- * DELETE /api/users/[sid]/bookmarks
+ * DELETE /api/users/[id]/bookmarks
  * お気に入りを削除
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { sid } = await params;
-    // URLエンコードされたSIDをデコード
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = await params;
+    // URLエンコードされたIDをデコード
+    const decodedId = decodeURIComponent(id);
     
     // bodyから取得を試みる（POSTと同じ形式）
     let material_id: string | null = null;
@@ -155,7 +155,7 @@ export async function DELETE(
       );
     }
 
-    const bookmarksPath = getUserSubPath(decodedSid, 'bookmarks.json');
+    const bookmarksPath = getUserSubPath(decodedId, 'bookmarks.json');
 
     // 既存のお気に入りを読み込む
     let bookmarks: string[] = [];
@@ -186,7 +186,7 @@ export async function DELETE(
     // 保存
     await writeJSON(bookmarksPath, bookmarks);
 
-    debug(MODULE_NAME, `お気に入り削除: sid=${decodedSid}, material_id=${material_id}`);
+    debug(MODULE_NAME, `お気に入り削除: userId=${decodedId}, material_id=${material_id}`);
 
     return NextResponse.json({
       success: true,

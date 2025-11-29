@@ -5,7 +5,7 @@ import { useConfirmDialog } from '@/contexts/ConfirmDialogContext';
 
 interface Feedback {
   id: string;
-  user_sid: string;
+  user_id: string;
   content?: string;
   created_date: string;
   updated_date: string;

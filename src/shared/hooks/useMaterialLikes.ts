@@ -33,13 +33,13 @@ export function useMaterialLikes({
     }
 
     // 一括取得で取得されていない場合のみ個別APIで取得
-    if (!user?.sid || !materialId) {
+    if (!user?.id || !materialId) {
       return;
     }
 
     const fetchLikeStatus = async () => {
       try {
-        const response = await fetch(`/api/materials/${materialId}/like?user_sid=${user.sid}`);
+        const response = await fetch(`/api/materials/${materialId}/like?user_id=${user.id}`);
         if (response.ok) {
           const data = await response.json();
           if (data.success) {
@@ -52,7 +52,7 @@ export function useMaterialLikes({
     };
 
     fetchLikeStatus();
-  }, [materialId, user?.sid, material?.is_liked]);
+  }, [materialId, user?.id, material?.is_liked]);
 
   // いいね数を更新（materialオブジェクトが更新された時）
   useEffect(() => {
@@ -61,7 +61,7 @@ export function useMaterialLikes({
 
   // いいねを追加/削除
   const toggleLike = useCallback(async () => {
-    if (!user?.sid || isLoading) {
+    if (!user?.id || isLoading) {
       return;
     }
 
@@ -82,7 +82,7 @@ export function useMaterialLikes({
       const response = await fetch(`/api/materials/${materialId}/like`, {
         method: isLiked ? 'DELETE' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_sid: user.sid }),
+        body: JSON.stringify({ user_id: user.id }),
       });
 
       if (response.ok) {
@@ -112,7 +112,7 @@ export function useMaterialLikes({
     } finally {
       setIsLoading(false);
     }
-  }, [materialId, user?.sid, isLiked, likes, isLoading, onLikesUpdate]);
+  }, [materialId, user?.id, isLiked, likes, isLoading, onLikesUpdate]);
 
   return {
     likes,

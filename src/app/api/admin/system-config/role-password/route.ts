@@ -86,7 +86,7 @@ export async function PUT(request: NextRequest) {
     const newPasswordHash = hashPassword(newPassword);
 
     // システム設定を更新
-    const updaterId = authResult.user.id ?? authResult.user.sid;
+    const updaterId = authResult.user.id;
     if (!updaterId) {
       return NextResponse.json(
         { success: false, error: '操作ユーザーIDを特定できませんでした' },

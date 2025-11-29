@@ -5,19 +5,20 @@ import { getUserProfile, updateUserData } from '@/shared/lib/data-access/users';
 import { getSystemConfig } from '@/shared/lib/data-access/system-config';
 import { verifyPassword } from '@/shared/lib/utils/password';
 import { requireAuth, requireAdmin, isAdmin } from '@/shared/lib/auth/middleware';
+import { clearAuthCache } from '@/shared/lib/auth/session-cache';
 import { info, error, debug } from '@/shared/lib/logger';
 
-const MODULE_NAME = 'api/users/[sid]/role';
+const MODULE_NAME = 'api/users/[id]/role';
 
 /**
- * PUT /api/users/[sid]/role
+ * PUT /api/users/[id]/role
  * ユーザーの権限を変更
  * - 自分自身の権限変更: 認証済みユーザーなら可能（パスワード認証付き）
  * - 他のユーザーの権限変更: 管理者のみ可能
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 認証チェック（認証済みユーザーなら誰でもアクセス可能）
@@ -27,18 +28,18 @@ export async function PUT(
     }
 
     const resolvedParams = await params;
-    const encodedSid = resolvedParams.sid;
+    const encodedId = resolvedParams.id;
     
-    // URLエンコードされたSIDをデコード（ハイフンなどが含まれる場合）
-    let sid: string;
+    // URLエンコードされたIDをデコード（ハイフンなどが含まれる場合）
+    let userId: string;
     try {
-      sid = decodeURIComponent(encodedSid);
+      userId = decodeURIComponent(encodedId);
     } catch {
       // デコードに失敗した場合はそのまま使用
-      sid = encodedSid;
+      userId = encodedId;
     }
     
-    const authUserId = authResult.user.id ?? authResult.user.sid;
+    const authUserId = authResult.user.id;
     if (!authUserId) {
       return NextResponse.json(
         { success: false, error: 'ユーザーIDを特定できませんでした' },
@@ -47,7 +48,7 @@ export async function PUT(
     }
     
     // 自分自身の権限変更か、他のユーザーの権限変更かを判定
-    const isSelfChange = authUserId === sid;
+    const isSelfChange = authUserId === userId;
     
     // 管理者権限チェック: キャッシュが古い可能性があるため、データベースから最新のユーザー情報を取得
     const currentUser = await getUserProfile(authUserId);
@@ -62,18 +63,27 @@ export async function PUT(
     const isAdminUser = isAdmin(currentUser);
     
     // デバッグ: ユーザー情報と権限チェック結果をログ出力
-    debug(MODULE_NAME, `権限チェック: sid=${currentUser.sid}, role=${currentUser.role}, isAdmin=${isAdminUser}, isSelfChange=${isSelfChange}, targetSid=${sid}`);
+    debug(
+      MODULE_NAME,
+      `権限チェック: id=${currentUser.id}, role=${currentUser.role}, isAdmin=${isAdminUser}, isSelfChange=${isSelfChange}, targetId=${userId}`
+    );
     
     // 他のユーザーの権限変更は管理者のみ可能
     if (!isSelfChange && !isAdminUser) {
-      error(MODULE_NAME, `権限変更拒否: 他のユーザーの権限変更は管理者のみ可能: sid=${currentUser.sid}, role=${currentUser.role}, targetSid=${sid}`);
+      error(
+        MODULE_NAME,
+        `権限変更拒否: 他のユーザーの権限変更は管理者のみ可能: id=${currentUser.id}, role=${currentUser.role}, targetId=${userId}`
+      );
       return NextResponse.json(
         { success: false, error: '他のユーザーの権限変更は管理者のみ可能です' },
         { status: 403 }
       );
     }
     
-    debug(MODULE_NAME, `権限変更リクエスト: sid=${sid}, encodedSid=${encodedSid}, changed_by=${authUserId}, isSelfChange=${isSelfChange}, isAdmin=${isAdminUser}`);
+    debug(
+      MODULE_NAME,
+      `権限変更リクエスト: id=${userId}, encodedId=${encodedId}, changed_by=${authUserId}, isSelfChange=${isSelfChange}, isAdmin=${isAdminUser}`
+    );
     
     const body = await request.json();
     const { new_role, password, changed_by } = body;
@@ -94,9 +104,9 @@ export async function PUT(
     }
 
     // ユーザーを取得
-    const user = await getUserProfile(sid);
+    const user = await getUserProfile(userId);
     if (!user) {
-      error(MODULE_NAME, `ユーザーが見つかりません: sid=${sid}`);
+      error(MODULE_NAME, `ユーザーが見つかりません: id=${userId}`);
       return NextResponse.json(
         { success: false, error: 'ユーザーが見つかりません' },
         { status: 404 }
@@ -143,19 +153,26 @@ export async function PUT(
 
     // 権限を更新
     try {
-      const updatedUser = await updateUserData(sid, {
+      const updatedUser = await updateUserData(userId, {
         role: new_role as 'user' | 'instructor' | 'admin',
       });
 
       if (!updatedUser) {
-        error(MODULE_NAME, `updateUserDataがnullを返しました: sid=${sid}`);
+        error(MODULE_NAME, `updateUserDataがnullを返しました: id=${userId}`);
         return NextResponse.json(
           { success: false, error: '権限の更新に失敗しました（ユーザーが見つからないか、データベースエラーが発生しました）' },
           { status: 500 }
         );
       }
 
-      info(MODULE_NAME, `権限変更成功: sid=${sid}, old_role=${user.role}, new_role=${new_role}, changed_by=${changed_by}`);
+      info(
+        MODULE_NAME,
+        `権限変更成功: id=${userId}, old_role=${user.role}, new_role=${new_role}, changed_by=${changed_by}`
+      );
+
+      // 権限が変更されたので、キャッシュをクリアして次回アクセス時に最新情報を取得させる
+      clearAuthCache(userId);
+      debug(MODULE_NAME, `権限変更によりキャッシュをクリア: id=${userId}`);
 
       return NextResponse.json({
         success: true,
@@ -163,7 +180,7 @@ export async function PUT(
         user: updatedUser,
       });
     } catch (updateError) {
-      error(MODULE_NAME, `updateUserDataでエラーが発生しました: sid=${sid}`, updateError);
+      error(MODULE_NAME, `updateUserDataでエラーが発生しました: id=${userId}`, updateError);
       return NextResponse.json(
         { success: false, error: `権限の更新に失敗しました: ${updateError instanceof Error ? updateError.message : '不明なエラー'}` },
         { status: 500 }
@@ -178,3 +195,4 @@ export async function PUT(
     );
   }
 }
+

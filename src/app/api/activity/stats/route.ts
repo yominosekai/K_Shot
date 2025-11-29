@@ -39,12 +39,12 @@ function getOverallStats(): OverallStats {
 
   // 活発ユーザー数（5日以上活動、ログイン日数ベース）
   const activeUsersStmt = localDb.prepare(`
-    SELECT user_sid, COUNT(DISTINCT date) as days
+    SELECT user_id, COUNT(DISTINCT date) as days
     FROM login_events
-    GROUP BY user_sid
+    GROUP BY user_id
     HAVING COUNT(DISTINCT date) >= 5
   `);
-  const activeUsersRows = activeUsersStmt.all() as Array<{ user_sid: string; days: number }>;
+  const activeUsersRows = activeUsersStmt.all() as Array<{ user_id: string; days: number }>;
   const activeUsers = activeUsersRows.length;
 
   // 総資料数
@@ -72,73 +72,73 @@ function getUserRankings(): UserActivityStats[] {
 
   // ユーザー一覧を取得
   const usersStmt = sharedDb.prepare(`
-    SELECT sid, display_name FROM users WHERE is_active = 1
+    SELECT id, display_name FROM users WHERE is_active = 1
   `);
-  const users = usersStmt.all() as Array<{ sid: string; display_name: string }>;
+  const users = usersStmt.all() as Array<{ id: string; display_name: string }>;
 
   if (users.length === 0) {
     return [];
   }
 
-  // ユーザーSIDのリストを作成
-  const userSids = users.map(u => u.sid);
-  const userSidSet = new Set(userSids);
+  // ユーザーIDのリストを作成
+  const userIds = users.map(u => u.id);
+  const userIdSet = new Set(userIds);
 
   // 1. 全ユーザーの閲覧数を一括取得（共有DB）
   const viewCountsStmt = sharedDb.prepare(`
-    SELECT user_sid, COUNT(*) as count
+    SELECT user_id, COUNT(*) as count
     FROM material_views
-    WHERE user_sid IN (${userSids.map(() => '?').join(',')})
-    GROUP BY user_sid
+    WHERE user_id IN (${userIds.map(() => '?').join(',')})
+    GROUP BY user_id
   `);
-  const viewCountsRows = viewCountsStmt.all(...userSids) as Array<{ user_sid: string; count: number }>;
+  const viewCountsRows = viewCountsStmt.all(...userIds) as Array<{ user_id: string; count: number }>;
   const viewCountsMap = new Map<string, number>();
   viewCountsRows.forEach(row => {
-    viewCountsMap.set(row.user_sid, row.count);
+    viewCountsMap.set(row.user_id, row.count);
   });
 
   // 2. 全ユーザーのユニーク資料数を一括取得（共有DB）
   const uniqueMaterialsStmt = sharedDb.prepare(`
-    SELECT user_sid, COUNT(DISTINCT material_id) as count
+    SELECT user_id, COUNT(DISTINCT material_id) as count
     FROM material_views
-    WHERE user_sid IN (${userSids.map(() => '?').join(',')})
-    GROUP BY user_sid
+    WHERE user_id IN (${userIds.map(() => '?').join(',')})
+    GROUP BY user_id
   `);
-  const uniqueMaterialsRows = uniqueMaterialsStmt.all(...userSids) as Array<{ user_sid: string; count: number }>;
+  const uniqueMaterialsRows = uniqueMaterialsStmt.all(...userIds) as Array<{ user_id: string; count: number }>;
   const uniqueMaterialsMap = new Map<string, number>();
   uniqueMaterialsRows.forEach(row => {
-    uniqueMaterialsMap.set(row.user_sid, row.count);
+    uniqueMaterialsMap.set(row.user_id, row.count);
   });
 
   // 3. 全ユーザーのアップロード資料数を一括取得（共有DB）
   const uploadedMaterialsStmt = sharedDb.prepare(`
-    SELECT created_by as user_sid, COUNT(*) as count
+    SELECT created_by as user_id, COUNT(*) as count
     FROM materials
-    WHERE created_by IN (${userSids.map(() => '?').join(',')}) AND is_published = 1
+    WHERE created_by IN (${userIds.map(() => '?').join(',')}) AND is_published = 1
     GROUP BY created_by
   `);
-  const uploadedMaterialsRows = uploadedMaterialsStmt.all(...userSids) as Array<{ user_sid: string; count: number }>;
+  const uploadedMaterialsRows = uploadedMaterialsStmt.all(...userIds) as Array<{ user_id: string; count: number }>;
   const uploadedMaterialsMap = new Map<string, number>();
   uploadedMaterialsRows.forEach(row => {
-    uploadedMaterialsMap.set(row.user_sid, row.count);
+    uploadedMaterialsMap.set(row.user_id, row.count);
   });
 
   // 4. 全ユーザーの日別データを一括取得（過去30日、共有DB）
   const startDate = getJSTDateString(30);
   const dailyDataStmt = sharedDb.prepare(`
-    SELECT user_sid, view_date as date, COUNT(*) as count
+    SELECT user_id, view_date as date, COUNT(*) as count
     FROM material_views
-    WHERE user_sid IN (${userSids.map(() => '?').join(',')}) AND view_date >= ?
-    GROUP BY user_sid, view_date
-    ORDER BY user_sid, view_date ASC
+    WHERE user_id IN (${userIds.map(() => '?').join(',')}) AND view_date >= ?
+    GROUP BY user_id, view_date
+    ORDER BY user_id, view_date ASC
   `);
-  const dailyDataRows = dailyDataStmt.all(...userSids, startDate) as Array<{ user_sid: string; date: string; count: number }>;
+  const dailyDataRows = dailyDataStmt.all(...userIds, startDate) as Array<{ user_id: string; date: string; count: number }>;
   const dailyDataMap = new Map<string, Array<{ date: string; count: number }>>();
   dailyDataRows.forEach(row => {
-    if (!dailyDataMap.has(row.user_sid)) {
-      dailyDataMap.set(row.user_sid, []);
+    if (!dailyDataMap.has(row.user_id)) {
+      dailyDataMap.set(row.user_id, []);
     }
-    dailyDataMap.get(row.user_sid)!.push({
+    dailyDataMap.get(row.user_id)!.push({
       date: row.date,
       count: row.count,
     });
@@ -148,28 +148,28 @@ function getUserRankings(): UserActivityStats[] {
   // 各ユーザーごとに上位10件を取得するため、サブクエリを使用
   const materialDataStmt = sharedDb.prepare(`
     SELECT 
-      mv.user_sid,
+      mv.user_id,
       mv.material_id,
       m.title,
       COUNT(*) as count
     FROM material_views mv
     LEFT JOIN materials m ON mv.material_id = m.id
-    WHERE mv.user_sid IN (${userSids.map(() => '?').join(',')})
-    GROUP BY mv.user_sid, mv.material_id, m.title
-    ORDER BY mv.user_sid, count DESC
+    WHERE mv.user_id IN (${userIds.map(() => '?').join(',')})
+    GROUP BY mv.user_id, mv.material_id, m.title
+    ORDER BY mv.user_id, count DESC
   `);
-  const materialDataRows = materialDataStmt.all(...userSids) as Array<{
-    user_sid: string;
+  const materialDataRows = materialDataStmt.all(...userIds) as Array<{
+    user_id: string;
     material_id: string;
     title: string | null;
     count: number;
   }>;
   const materialDataMap = new Map<string, Array<{ materialId: string; title: string; count: number }>>();
   materialDataRows.forEach(row => {
-    if (!materialDataMap.has(row.user_sid)) {
-      materialDataMap.set(row.user_sid, []);
+    if (!materialDataMap.has(row.user_id)) {
+      materialDataMap.set(row.user_id, []);
     }
-    const userMaterials = materialDataMap.get(row.user_sid)!;
+    const userMaterials = materialDataMap.get(row.user_id)!;
     // 各ユーザーごとに上位10件まで
     if (userMaterials.length < 10) {
       userMaterials.push({
@@ -184,36 +184,36 @@ function getUserRankings(): UserActivityStats[] {
   const loginCountsMap = new Map<string, number>();
   const activeDaysMap = new Map<string, number>();
 
-  for (const userSid of userSids) {
+  for (const userId of userIds) {
     // ログイン回数（ローカルDBから）
     const loginCountStmt = localDb.prepare(`
-      SELECT COUNT(*) as count FROM login_events WHERE user_sid = ?
+      SELECT COUNT(*) as count FROM login_events WHERE user_id = ?
     `);
-    const loginCount = (loginCountStmt.get(userSid) as { count: number })?.count || 0;
-    loginCountsMap.set(userSid, loginCount);
+    const loginCount = (loginCountStmt.get(userId) as { count: number })?.count || 0;
+    loginCountsMap.set(userId, loginCount);
 
     // アクティブ日数（ローカルDBから）
     const activeDaysStmt = localDb.prepare(`
-      SELECT COUNT(DISTINCT date) as count FROM login_events WHERE user_sid = ?
+      SELECT COUNT(DISTINCT date) as count FROM login_events WHERE user_id = ?
     `);
-    const activeDays = (activeDaysStmt.get(userSid) as { count: number })?.count || 0;
-    activeDaysMap.set(userSid, activeDays);
+    const activeDays = (activeDaysStmt.get(userId) as { count: number })?.count || 0;
+    activeDaysMap.set(userId, activeDays);
   }
 
   // ランキングデータを構築
   const rankings: UserActivityStats[] = users.map(user => {
-    const userSid = user.sid;
+    const userId = user.id;
     return {
-      userSid,
+      userId,
       displayName: user.display_name,
-      loginCount: loginCountsMap.get(userSid) || 0,
-      viewCount: viewCountsMap.get(userSid) || 0,
-      uniqueMaterials: uniqueMaterialsMap.get(userSid) || 0,
-      uploadedMaterials: uploadedMaterialsMap.get(userSid) || 0,
-      activeDays: activeDaysMap.get(userSid) || 0,
-      dailyData: dailyDataMap.get(userSid) || [],
+      loginCount: loginCountsMap.get(userId) || 0,
+      viewCount: viewCountsMap.get(userId) || 0,
+      uniqueMaterials: uniqueMaterialsMap.get(userId) || 0,
+      uploadedMaterials: uploadedMaterialsMap.get(userId) || 0,
+      activeDays: activeDaysMap.get(userId) || 0,
+      dailyData: dailyDataMap.get(userId) || [],
       activityData: [], // ランキング表示では不要なため空配列
-      materialData: materialDataMap.get(userSid) || [],
+      materialData: materialDataMap.get(userId) || [],
     };
   });
 
@@ -230,17 +230,17 @@ function getUserDistribution(): UserDistribution[] {
   // ユーザー別の閲覧数とユニーク資料数を取得
   const distributionStmt = sharedDb.prepare(`
     SELECT 
-      mv.user_sid,
+      mv.user_id,
       u.display_name,
       COUNT(*) as view_count,
       COUNT(DISTINCT mv.material_id) as unique_materials
     FROM material_views mv
-    LEFT JOIN users u ON mv.user_sid = u.sid
+    LEFT JOIN users u ON mv.user_id = u.id
     WHERE u.is_active = 1
-    GROUP BY mv.user_sid, u.display_name
+    GROUP BY mv.user_id, u.display_name
   `);
   const distributionRows = distributionStmt.all() as Array<{
-    user_sid: string;
+    user_id: string;
     display_name: string;
     view_count: number;
     unique_materials: number;
@@ -265,7 +265,7 @@ function getUserDistribution(): UserDistribution[] {
     }
 
     return {
-      userSid: row.user_sid,
+      userId: row.user_id,
       displayName: row.display_name,
       viewCount: row.view_count,
       uniqueMaterials: row.unique_materials,
@@ -281,13 +281,13 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type'); // 'overall' | 'individual'
-    const userSid = searchParams.get('userSid');
+    const userId = searchParams.get('userId') || searchParams.get('userSid'); // 後方互換性のため userSid も受け付ける
     const period = searchParams.get('period') as Period || '1month';
     const startDate = searchParams.get('startDate'); // カスタム範囲の開始日
     const endDate = searchParams.get('endDate');     // カスタム範囲の終了日
     const granularityParam = searchParams.get('granularity') as 'daily' | 'weekly' | 'monthly' | null;
 
-    if (type === 'individual' && userSid) {
+    if (type === 'individual' && userId) {
       // 個別統計を取得
       const sharedDb = getDatabase();
       const localDb = getActivityAggregatorDb();
@@ -303,9 +303,9 @@ export async function GET(request: NextRequest) {
 
       // ユーザー情報を取得
       const userStmt = sharedDb.prepare(`
-        SELECT sid, display_name FROM users WHERE sid = ?
+        SELECT id, display_name FROM users WHERE id = ?
       `);
-      const user = userStmt.get(userSid) as { sid: string; display_name: string } | undefined;
+      const user = userStmt.get(userId) as { id: string; display_name: string } | undefined;
 
       if (!user) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -335,33 +335,33 @@ export async function GET(request: NextRequest) {
 
       // ログイン回数
       const loginCountStmt = localDb.prepare(`
-        SELECT COUNT(*) as count FROM login_events WHERE user_sid = ? AND date >= ? AND date <= ?
+        SELECT COUNT(*) as count FROM login_events WHERE user_id = ? AND date >= ? AND date <= ?
       `);
-      const loginCount = (loginCountStmt.get(userSid, filterStartDate, filterEndDate) as { count: number })?.count || 0;
+      const loginCount = (loginCountStmt.get(userId, filterStartDate, filterEndDate) as { count: number })?.count || 0;
 
       // 閲覧数
       const viewCountStmt = sharedDb.prepare(`
-        SELECT COUNT(*) as count FROM material_views WHERE user_sid = ? AND view_date >= ? AND view_date <= ?
+        SELECT COUNT(*) as count FROM material_views WHERE user_id = ? AND view_date >= ? AND view_date <= ?
       `);
-      const viewCount = (viewCountStmt.get(userSid, filterStartDate, filterEndDate) as { count: number })?.count || 0;
+      const viewCount = (viewCountStmt.get(userId, filterStartDate, filterEndDate) as { count: number })?.count || 0;
 
       // ユニーク資料数
       const uniqueMaterialsStmt = sharedDb.prepare(`
-        SELECT COUNT(DISTINCT material_id) as count FROM material_views WHERE user_sid = ? AND view_date >= ? AND view_date <= ?
+        SELECT COUNT(DISTINCT material_id) as count FROM material_views WHERE user_id = ? AND view_date >= ? AND view_date <= ?
       `);
-      const uniqueMaterials = (uniqueMaterialsStmt.get(userSid, filterStartDate, filterEndDate) as { count: number })?.count || 0;
+      const uniqueMaterials = (uniqueMaterialsStmt.get(userId, filterStartDate, filterEndDate) as { count: number })?.count || 0;
 
       // アップロード資料数（期間フィルタ付き）
       const uploadedMaterialsStmt = sharedDb.prepare(`
         SELECT COUNT(*) as count FROM materials WHERE created_by = ? AND is_published = 1 AND created_date >= ? AND created_date <= ?
       `);
-      const uploadedMaterials = (uploadedMaterialsStmt.get(userSid, filterStartDate, filterEndDate) as { count: number })?.count || 0;
+      const uploadedMaterials = (uploadedMaterialsStmt.get(userId, filterStartDate, filterEndDate) as { count: number })?.count || 0;
 
       // アクティブ日数（ログイン日数と同じロジック）
       const activeDaysStmt = localDb.prepare(`
-        SELECT COUNT(DISTINCT date) as count FROM login_events WHERE user_sid = ? AND date >= ? AND date <= ?
+        SELECT COUNT(DISTINCT date) as count FROM login_events WHERE user_id = ? AND date >= ? AND date <= ?
       `);
-      const activeDays = (activeDaysStmt.get(userSid, filterStartDate, filterEndDate) as { count: number })?.count || 0;
+      const activeDays = (activeDaysStmt.get(userId, filterStartDate, filterEndDate) as { count: number })?.count || 0;
 
       // アクティビティデータ（粒度に応じて集計）
       // 閲覧数とアップロード数の両方を取得
@@ -372,11 +372,11 @@ export async function GET(request: NextRequest) {
         const dailyViewDataStmt = sharedDb.prepare(`
           SELECT view_date as date, COUNT(*) as count
           FROM material_views
-          WHERE user_sid = ? AND view_date >= ? AND view_date <= ?
+          WHERE user_id = ? AND view_date >= ? AND view_date <= ?
           GROUP BY view_date
           ORDER BY view_date ASC
         `);
-        const dailyViewRows = dailyViewDataStmt.all(userSid, filterStartDate, filterEndDate) as Array<{ date: string; count: number }>;
+        const dailyViewRows = dailyViewDataStmt.all(userId, filterStartDate, filterEndDate) as Array<{ date: string; count: number }>;
         
         // 日次データ - アップロード数（created_dateをJSTに変換して集計）
         const uploadDataStmt = sharedDb.prepare(`
@@ -386,7 +386,7 @@ export async function GET(request: NextRequest) {
         `);
         const startDateUTC = new Date(filterStartDate + 'T00:00:00+09:00').toISOString();
         const endDateUTC = new Date(filterEndDate + 'T23:59:59+09:00').toISOString();
-        const uploadRows = uploadDataStmt.all(userSid, startDateUTC, endDateUTC) as Array<{ created_date: string }>;
+        const uploadRows = uploadDataStmt.all(userId, startDateUTC, endDateUTC) as Array<{ created_date: string }>;
         
         // アップロード数を日付ごとに集計
         const uploadMap = new Map<string, number>();
@@ -448,9 +448,9 @@ export async function GET(request: NextRequest) {
           const weekViewStmt = sharedDb.prepare(`
             SELECT COUNT(*) as count
             FROM material_views
-            WHERE user_sid = ? AND view_date >= ? AND view_date <= ?
+            WHERE user_id = ? AND view_date >= ? AND view_date <= ?
           `);
-          const weekViewData = weekViewStmt.get(userSid, weekStartStr, weekEndStr) as { count: number } | undefined;
+          const weekViewData = weekViewStmt.get(userId, weekStartStr, weekEndStr) as { count: number } | undefined;
           
           // アップロード数
           const weekUploadStmt = sharedDb.prepare(`
@@ -458,7 +458,7 @@ export async function GET(request: NextRequest) {
             FROM materials
             WHERE created_by = ? AND is_published = 1 AND created_date >= ? AND created_date < ?
           `);
-          const weekUploadRows = weekUploadStmt.all(userSid, weekStartUTC, weekEndUTC) as Array<{ created_date: string }>;
+          const weekUploadRows = weekUploadStmt.all(userId, weekStartUTC, weekEndUTC) as Array<{ created_date: string }>;
           
           // アップロード数を週の範囲内で集計
           let uploadCount = 0;
@@ -502,9 +502,9 @@ export async function GET(request: NextRequest) {
           const monthViewStmt = sharedDb.prepare(`
             SELECT COUNT(*) as count
             FROM material_views
-            WHERE user_sid = ? AND view_date >= ? AND view_date <= ?
+            WHERE user_id = ? AND view_date >= ? AND view_date <= ?
           `);
-          const monthViewData = monthViewStmt.get(userSid, monthStartStr, monthEndStr) as { count: number } | undefined;
+          const monthViewData = monthViewStmt.get(userId, monthStartStr, monthEndStr) as { count: number } | undefined;
           
           // アップロード数
           const monthUploadStmt = sharedDb.prepare(`
@@ -512,7 +512,7 @@ export async function GET(request: NextRequest) {
             FROM materials
             WHERE created_by = ? AND is_published = 1 AND created_date >= ? AND created_date < ?
           `);
-          const monthUploadRows = monthUploadStmt.all(userSid, monthStartUTC, monthEndUTC) as Array<{ created_date: string }>;
+          const monthUploadRows = monthUploadStmt.all(userId, monthStartUTC, monthEndUTC) as Array<{ created_date: string }>;
           
           // アップロード数を月の範囲内で集計
           let uploadCount = 0;
@@ -548,12 +548,12 @@ export async function GET(request: NextRequest) {
           COUNT(*) as count
         FROM material_views mv
         LEFT JOIN materials m ON mv.material_id = m.id
-        WHERE mv.user_sid = ? AND mv.view_date >= ? AND mv.view_date <= ?
+        WHERE mv.user_id = ? AND mv.view_date >= ? AND mv.view_date <= ?
         GROUP BY mv.material_id, m.title
         ORDER BY count DESC
         LIMIT 10
       `);
-      const materialDataRows = materialDataStmt.all(userSid, filterStartDate, filterEndDate) as Array<{
+      const materialDataRows = materialDataStmt.all(userId, filterStartDate, filterEndDate) as Array<{
         material_id: string;
         title: string | null;
         count: number;
@@ -565,7 +565,7 @@ export async function GET(request: NextRequest) {
       }));
 
       const userStats: UserActivityStats = {
-        userSid: user.sid,
+        userId: user.id,
         displayName: user.display_name,
         loginCount,
         viewCount,

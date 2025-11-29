@@ -14,7 +14,7 @@ export interface DeviceTokenFile {
   schema_version: string;
   token: string;
   signature: string;
-  user_sid: string;
+  user_id: string;
   issued_at: string;
   device_label?: string;
   signature_version?: number;
@@ -55,13 +55,13 @@ function getTokenSecret(): string {
 
 export function signToken(payload: {
   token: string;
-  userSid: string;
+  userId: string;
   issuedAt: string;
   deviceLabel?: string;
 }): string {
   const secret = getTokenSecret();
   const hmac = crypto.createHmac('sha256', secret);
-  hmac.update(`${payload.token}:${payload.userSid}:${payload.issuedAt}:${payload.deviceLabel || ''}`);
+  hmac.update(`${payload.token}:${payload.userId}:${payload.issuedAt}:${payload.deviceLabel || ''}`);
   return hmac.digest('hex');
 }
 
@@ -69,7 +69,7 @@ export function verifyTokenSignature(tokenFile: DeviceTokenFile): boolean {
   try {
     const expected = signToken({
       token: tokenFile.token,
-      userSid: tokenFile.user_sid,
+      userId: tokenFile.user_id,
       issuedAt: tokenFile.issued_at,
       deviceLabel: tokenFile.device_label,
     });

@@ -10,26 +10,26 @@ const MODULE_NAME = 'api/materials/[id]/utils/view-counter';
 /**
  * 資料の閲覧数をカウント（重複防止付き）
  */
-export async function incrementMaterialView(materialId: string, userSid: string): Promise<void> {
+export async function incrementMaterialView(materialId: string, userId: string): Promise<void> {
   try {
     const db = getDatabase();
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD形式
 
     // ログ用途では毎回記録（同一日・同一資料でも追記）
-    recordMaterialViewActivityEvent(userSid, materialId);
+    recordMaterialViewActivityEvent(userId, materialId);
 
     // 今日既に閲覧しているかチェック
     const checkView = db.prepare(`
       SELECT * FROM material_views
-      WHERE material_id = ? AND user_sid = ? AND view_date = ?
+      WHERE material_id = ? AND user_id = ? AND view_date = ?
     `);
-    const existingView = checkView.get(materialId, userSid, today);
+    const existingView = checkView.get(materialId, userId, today);
 
     // 今日初めての閲覧の場合のみカウント
     if (!existingView) {
       // 閲覧履歴を追加
       const insertView = db.prepare(`
-        INSERT INTO material_views (material_id, user_sid, view_date)
+        INSERT INTO material_views (material_id, user_id, view_date)
         VALUES (?, ?, ?)
       `);
 
@@ -42,7 +42,7 @@ export async function incrementMaterialView(materialId: string, userSid: string)
 
       // トランザクションで実行
       const transaction = db.transaction(() => {
-        insertView.run(materialId, userSid, today);
+        insertView.run(materialId, userId, today);
         updateViews.run(materialId);
       });
 
@@ -55,10 +55,13 @@ export async function incrementMaterialView(materialId: string, userSid: string)
         try {
           transaction();
           if (retryCount > 0) {
-            debug(MODULE_NAME, `閲覧数カウント成功（リトライ ${retryCount}回後）: materialId=${materialId}, userSid=${userSid}`);
-            await logBusyError(userSid, 'incrementMaterialView', retryCount, true, { materialId });
+            debug(
+              MODULE_NAME,
+              `閲覧数カウント成功（リトライ ${retryCount}回後）: materialId=${materialId}, userId=${userId}`
+            );
+            await logBusyError(userId, 'incrementMaterialView', retryCount, true, { materialId });
           } else {
-            debug(MODULE_NAME, `閲覧数カウント: materialId=${materialId}, userSid=${userSid}`);
+            debug(MODULE_NAME, `閲覧数カウント: materialId=${materialId}, userId=${userId}`);
           }
           break;
         } catch (err: any) {
@@ -66,15 +69,22 @@ export async function incrementMaterialView(materialId: string, userSid: string)
           if (err.code === 'SQLITE_BUSY' && retryCount < maxRetries - 1) {
             retryCount++;
             const waitTime = 50 * retryCount;
-            debug(MODULE_NAME, `SQLite書き込み競合検出（リトライ ${retryCount}回目）: materialId=${materialId}, ${waitTime}ms待機`);
+            debug(
+              MODULE_NAME,
+              `SQLite書き込み競合検出（リトライ ${retryCount}回目）: materialId=${materialId}, ${waitTime}ms待機`
+            );
             await new Promise((resolve) => setTimeout(resolve, waitTime));
             continue;
           }
           // 閲覧数カウントのエラーは無視して続行（資料取得は成功させる）
-          error(MODULE_NAME, `閲覧数カウントエラー（無視して続行）: materialId=${materialId}`, err);
+          error(
+            MODULE_NAME,
+            `閲覧数カウントエラー（無視して続行）: materialId=${materialId}`,
+            err
+          );
           // SQLITE_BUSYが発生して最終的に失敗した場合のログ（エラーは無視するがログは残す）
           if (err.code === 'SQLITE_BUSY') {
-            await logBusyError(userSid, 'incrementMaterialView', retryCount, false, { materialId });
+            await logBusyError(userId, 'incrementMaterialView', retryCount, false, { materialId });
           }
           break;
         }

@@ -10,7 +10,6 @@ import { useUsers } from '@/contexts/UsersContext';
 
 interface SearchSuggestion {
   id?: string;
-  sid?: string;
   title?: string;
   display_name?: string;
   username?: string;
@@ -28,7 +27,7 @@ interface SearchDropdownProps {
   onSearchValueChange: (value: string) => void;
   onSearch: (query: string) => void;
   onMaterialClick?: (materialId: string) => void;
-  onUserClick?: (userSid: string) => void;
+  onUserClick?: (userId: string) => void;
 }
 
 const SEARCH_HISTORY_KEY = 'search_history';
@@ -96,7 +95,7 @@ export default function SearchDropdown({
             }));
 
             const userSuggestions: SearchSuggestion[] = (data.users || []).map((u: any) => ({
-              sid: u.sid,
+              id: u.id,
               display_name: u.display_name,
               username: u.username,
               email: u.email,
@@ -182,9 +181,9 @@ export default function SearchDropdown({
         // フォールバック: モーダルが使えない場合は画面遷移
         router.push(`/materials?material=${suggestion.id}`);
       }
-    } else if (suggestion.type_label === 'user' && suggestion.sid) {
+    } else if (suggestion.type_label === 'user' && suggestion.id) {
       if (onUserClick) {
-        onUserClick(suggestion.sid);
+        onUserClick(suggestion.id);
       } else {
         // フォールバック: モーダルが使えない場合は画面遷移
         router.push(`/members`);
@@ -270,10 +269,10 @@ export default function SearchDropdown({
                     <>
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden ring-1 ring-gray-200 dark:ring-gray-700">
                         {(() => {
-                          if (!suggestion.sid) {
+                          if (!suggestion.id) {
                             return suggestion.display_name?.charAt(0) || suggestion.username?.charAt(0) || 'U';
                           }
-                          const avatarUrl = getAvatarUrl(suggestion.sid);
+                          const avatarUrl = getAvatarUrl(suggestion.id);
                           return avatarUrl ? (
                             <Image
                               src={avatarUrl}

@@ -68,7 +68,7 @@ export default function ProfilePage() {
     if (!user) return;
 
     try {
-      const userId = user.id ?? user.sid;
+      const userId = user.id;
       if (!userId) {
         setError('ユーザーIDを特定できませんでした');
         return;

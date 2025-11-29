@@ -16,7 +16,7 @@ interface LogsFilterSectionProps {
   onDateFromChange: (date: string) => void;
   dateTo: string;
   onDateToChange: (date: string) => void;
-  uniqueUsers: Array<{ sid: string; displayName: string }>;
+  uniqueUsers: Array<{ id: string; displayName: string }>;
   loading: boolean;
   onRefresh: () => void;
 }
@@ -67,7 +67,7 @@ export default function LogsFilterSection({
           >
             <option value="all">すべて</option>
             {uniqueUsers.map(user => (
-              <option key={user.sid} value={user.sid}>
+              <option key={user.id} value={user.id}>
                 {user.displayName}
               </option>
             ))}

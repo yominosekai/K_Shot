@@ -8,12 +8,12 @@ import type { User as UserType } from '@/features/auth/types';
 import { useUsers } from '@/contexts/UsersContext';
 
 interface UseHeaderSearchProps {
-  userSid?: string;
+  userId?: string;
   onMaterialClick?: (material: MaterialNormalized) => void;
   onUserClick?: (user: UserType) => void;
 }
 
-export function useHeaderSearch({ userSid, onMaterialClick, onUserClick }: UseHeaderSearchProps) {
+export function useHeaderSearch({ userId, onMaterialClick, onUserClick }: UseHeaderSearchProps) {
   const router = useRouter();
   const { registerSetSearchValueAndFocus } = useSearch();
   const [searchValue, setSearchValue] = useState('');
@@ -48,7 +48,9 @@ export function useHeaderSearch({ userSid, onMaterialClick, onUserClick }: UseHe
   // 資料をクリックした時の処理
   const handleMaterialClick = async (materialId: string) => {
     try {
-      const response = await fetch(`/api/materials/${materialId}${userSid ? `?user_sid=${userSid}` : ''}`);
+      const response = await fetch(
+        `/api/materials/${materialId}${userId ? `?user_id=${userId}` : ''}`
+      );
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.material) {
@@ -64,9 +66,9 @@ export function useHeaderSearch({ userSid, onMaterialClick, onUserClick }: UseHe
   };
 
   // ユーザーをクリックした時の処理
-  const handleUserClick = async (userSid: string) => {
+  const handleUserClick = async (userId: string) => {
     try {
-      const user = await getUserFromContext(userSid);
+      const user = await getUserFromContext(userId);
       if (user) {
         if (onUserClick) {
           onUserClick(user);

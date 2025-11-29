@@ -18,7 +18,7 @@ export async function POST(
   try {
     const { id: materialId } = await params;
     const body = await request.json();
-    const { user_sid } = body;
+    const { user_id } = body;
 
     if (!materialId) {
       return NextResponse.json(
@@ -30,11 +30,11 @@ export async function POST(
       );
     }
 
-    if (!user_sid) {
+    if (!user_id) {
       return NextResponse.json(
         {
           success: false,
-          error: 'ユーザーSIDが指定されていません',
+          error: 'ユーザーIDが指定されていません',
         },
         { status: 400 }
       );
@@ -46,9 +46,9 @@ export async function POST(
     // 既にいいねしているかチェック
     const checkLike = db.prepare(`
       SELECT * FROM material_likes
-      WHERE material_id = ? AND user_sid = ?
+      WHERE material_id = ? AND user_id = ?
     `);
-    const existingLike = checkLike.get(materialId, user_sid);
+    const existingLike = checkLike.get(materialId, user_id);
 
     if (existingLike) {
       return NextResponse.json({
@@ -60,7 +60,7 @@ export async function POST(
 
     // いいねを追加
     const insertLike = db.prepare(`
-      INSERT INTO material_likes (material_id, user_sid, created_date)
+      INSERT INTO material_likes (material_id, user_id, created_date)
       VALUES (?, ?, ?)
     `);
 
@@ -73,7 +73,7 @@ export async function POST(
 
     // トランザクションで実行
     const transaction = db.transaction(() => {
-      insertLike.run(materialId, user_sid, now);
+      insertLike.run(materialId, user_id, now);
       updateLikes.run(materialId);
     });
 
@@ -86,11 +86,14 @@ export async function POST(
       try {
         transaction();
         if (retryCount > 0) {
-          debug(MODULE_NAME, `いいね追加成功（リトライ ${retryCount}回後）: materialId=${materialId}, userSid=${user_sid}`);
+          debug(
+            MODULE_NAME,
+            `いいね追加成功（リトライ ${retryCount}回後）: materialId=${materialId}, userId=${user_id}`
+          );
           // SQLITE_BUSYが発生したが最終的に成功した場合のログ
-          await logBusyError(user_sid, 'addMaterialLike', retryCount, true, { materialId });
+          await logBusyError(user_id, 'addMaterialLike', retryCount, true, { materialId });
         } else {
-          debug(MODULE_NAME, `いいね追加: materialId=${materialId}, userSid=${user_sid}`);
+          debug(MODULE_NAME, `いいね追加: materialId=${materialId}, userId=${user_id}`);
         }
         break;
       } catch (err: any) {
@@ -107,9 +110,13 @@ export async function POST(
     }
 
     if (retryCount >= maxRetries && lastError) {
-      error(MODULE_NAME, `いいね追加失敗（最大リトライ回数に達しました）: materialId=${materialId}`, lastError);
+      error(
+        MODULE_NAME,
+        `いいね追加失敗（最大リトライ回数に達しました）: materialId=${materialId}`,
+        lastError
+      );
       // SQLITE_BUSYが発生して最終的に失敗した場合のログ
-      await logBusyError(user_sid, 'addMaterialLike', retryCount, false, { materialId });
+      await logBusyError(user_id, 'addMaterialLike', retryCount, false, { materialId });
       throw lastError;
     }
 
@@ -148,7 +155,7 @@ export async function DELETE(
   try {
     const { id: materialId } = await params;
     const body = await request.json();
-    const { user_sid } = body;
+    const { user_id } = body;
 
     if (!materialId) {
       return NextResponse.json(
@@ -160,11 +167,11 @@ export async function DELETE(
       );
     }
 
-    if (!user_sid) {
+    if (!user_id) {
       return NextResponse.json(
         {
           success: false,
-          error: 'ユーザーSIDが指定されていません',
+          error: 'ユーザーIDが指定されていません',
         },
         { status: 400 }
       );
@@ -175,7 +182,7 @@ export async function DELETE(
     // いいねを削除
     const deleteLike = db.prepare(`
       DELETE FROM material_likes
-      WHERE material_id = ? AND user_sid = ?
+      WHERE material_id = ? AND user_id = ?
     `);
 
     // 資料のいいね数を更新
@@ -187,7 +194,7 @@ export async function DELETE(
 
     // トランザクションで実行
     const transaction = db.transaction(() => {
-      const result = deleteLike.run(materialId, user_sid);
+      const result = deleteLike.run(materialId, user_id);
       if (result.changes > 0) {
         updateLikes.run(materialId);
       }
@@ -202,11 +209,14 @@ export async function DELETE(
       try {
         transaction();
         if (retryCount > 0) {
-          debug(MODULE_NAME, `いいね削除成功（リトライ ${retryCount}回後）: materialId=${materialId}, userSid=${user_sid}`);
+          debug(
+            MODULE_NAME,
+            `いいね削除成功（リトライ ${retryCount}回後）: materialId=${materialId}, userId=${user_id}`
+          );
           // SQLITE_BUSYが発生したが最終的に成功した場合のログ
-          await logBusyError(user_sid, 'removeMaterialLike', retryCount, true, { materialId });
+          await logBusyError(user_id, 'removeMaterialLike', retryCount, true, { materialId });
         } else {
-          debug(MODULE_NAME, `いいね削除: materialId=${materialId}, userSid=${user_sid}`);
+          debug(MODULE_NAME, `いいね削除: materialId=${materialId}, userId=${user_id}`);
         }
         break;
       } catch (err: any) {
@@ -214,7 +224,10 @@ export async function DELETE(
         if (err.code === 'SQLITE_BUSY' && retryCount < maxRetries - 1) {
           retryCount++;
           const waitTime = 50 * retryCount;
-          debug(MODULE_NAME, `SQLite書き込み競合検出（リトライ ${retryCount}回目）: materialId=${materialId}, ${waitTime}ms待機`);
+          debug(
+            MODULE_NAME,
+            `SQLite書き込み競合検出（リトライ ${retryCount}回目）: materialId=${materialId}, ${waitTime}ms待機`
+          );
           await new Promise((resolve) => setTimeout(resolve, waitTime));
           continue;
         }
@@ -223,9 +236,13 @@ export async function DELETE(
     }
 
     if (retryCount >= maxRetries && lastError) {
-      error(MODULE_NAME, `いいね削除失敗（最大リトライ回数に達しました）: materialId=${materialId}`, lastError);
+      error(
+        MODULE_NAME,
+        `いいね削除失敗（最大リトライ回数に達しました）: materialId=${materialId}`,
+        lastError
+      );
       // SQLITE_BUSYが発生して最終的に失敗した場合のログ
-      await logBusyError(user_sid, 'removeMaterialLike', retryCount, false, { materialId });
+      await logBusyError(user_id, 'removeMaterialLike', retryCount, false, { materialId });
       throw lastError;
     }
 
@@ -264,7 +281,7 @@ export async function GET(
   try {
     const { id: materialId } = await params;
     const { searchParams } = new URL(request.url);
-    const user_sid = searchParams.get('user_sid');
+    const user_id = searchParams.get('user_id');
 
     if (!materialId) {
       return NextResponse.json(
@@ -276,7 +293,7 @@ export async function GET(
       );
     }
 
-    if (!user_sid) {
+    if (!user_id) {
       return NextResponse.json({
         success: true,
         is_liked: false,
@@ -286,9 +303,9 @@ export async function GET(
     const db = getDatabase();
     const checkLike = db.prepare(`
       SELECT * FROM material_likes
-      WHERE material_id = ? AND user_sid = ?
+      WHERE material_id = ? AND user_id = ?
     `);
-    const like = checkLike.get(materialId, user_sid);
+    const like = checkLike.get(materialId, user_id);
 
     return NextResponse.json({
       success: true,

@@ -14,11 +14,13 @@ export function useComments(material: MaterialNormalized | null, isOpen: boolean
   const [userCache, setUserCache] = useState<Map<string, any>>(new Map());
 
   const fetchComments = useCallback(async () => {
-    if (!material || !user?.sid) return;
+    if (!material || !user?.id) return;
 
     try {
       setLoading(true);
-      const response = await fetch(`/api/materials/${material.id}/comments?user_sid=${user.sid}`);
+      const response = await fetch(
+        `/api/materials/${material.id}/comments?user_id=${user.id}`
+      );
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -40,9 +42,9 @@ export function useComments(material: MaterialNormalized | null, isOpen: boolean
           if (userIds.size > 0) {
             const users = await getUsersFromContext(Array.from(userIds));
             const newCache = new Map<string, any>();
-            users.forEach((u, sid) => {
+            users.forEach((u, userId) => {
               if (u) {
-                newCache.set(sid, u);
+                newCache.set(userId, u);
               }
             });
             setUserCache(newCache);
@@ -54,7 +56,7 @@ export function useComments(material: MaterialNormalized | null, isOpen: boolean
     } finally {
       setLoading(false);
     }
-  }, [material, user?.sid, getUsersFromContext]);
+  }, [material, user?.id, getUsersFromContext]);
 
   useEffect(() => {
     if (isOpen && material) {

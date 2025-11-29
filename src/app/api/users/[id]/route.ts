@@ -3,18 +3,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserData, updateUserData, deleteUser } from '@/shared/lib/data-access/users';
 import { requireAuth, requireOwnerOrAdmin, isAdmin, requireAdmin } from '@/shared/lib/auth/middleware';
-import { error } from '@/shared/lib/logger';
+import { clearAuthCache } from '@/shared/lib/auth/session-cache';
+import { error, debug } from '@/shared/lib/logger';
 
-const MODULE_NAME = 'api/users/[sid]';
+const MODULE_NAME = 'api/users/[id]';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { sid } = await params;
-    // URLエンコードされたSIDをデコード
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = await params;
+    // URLエンコードされたIDをデコード
+    const decodedId = decodeURIComponent(id);
 
     // 認証チェック（認証済みユーザーなら誰でもアクセス可能 - クローズド環境のため）
     const authResult = await requireAuth();
@@ -22,7 +23,7 @@ export async function GET(
       return authResult.response;
     }
 
-    const user = await getUserData(decodedSid);
+    const user = await getUserData(decodedId);
 
     if (!user) {
       return NextResponse.json(
@@ -46,15 +47,15 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { sid } = await params;
-    // URLエンコードされたSIDをデコード
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = await params;
+    // URLエンコードされたIDをデコード
+    const decodedId = decodeURIComponent(id);
 
     // 認証・認可チェック（本人または管理者のみ更新可能）
-    const authResult = await requireOwnerOrAdmin(decodedSid);
+    const authResult = await requireOwnerOrAdmin(decodedId);
     if (!authResult.success) {
       return authResult.response;
     }
@@ -69,13 +70,23 @@ export async function PUT(
       );
     }
 
-    const updatedUser = await updateUserData(decodedSid, body);
+    // roleが変更される可能性がある場合、変更前のユーザー情報を取得
+    const oldUser = body.role !== undefined ? await getUserData(decodedId) : null;
+    const roleChanged = oldUser && body.role !== undefined && oldUser.role !== body.role;
+
+    const updatedUser = await updateUserData(decodedId, body);
 
     if (!updatedUser) {
       return NextResponse.json(
         { success: false, error: 'User not found' },
         { status: 404 }
       );
+    }
+
+    // roleが変更された場合はキャッシュをクリア
+    if (roleChanged) {
+      clearAuthCache(decodedId);
+      debug(MODULE_NAME, `権限変更によりキャッシュをクリア: id=${decodedId}`);
     }
 
     return NextResponse.json({
@@ -93,12 +104,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { sid } = await params;
-    // URLエンコードされたSIDをデコード
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = await params;
+    // URLエンコードされたIDをデコード
+    const decodedId = decodeURIComponent(id);
 
     // 認証・認可チェック（管理者のみ削除可能）
     const authResult = await requireAdmin();
@@ -106,7 +117,7 @@ export async function DELETE(
       return authResult.response;
     }
     
-    const success = await deleteUser(decodedSid);
+    const success = await deleteUser(decodedId);
     
     if (!success) {
       return NextResponse.json(
@@ -127,4 +138,5 @@ export async function DELETE(
     );
   }
 }
+
 

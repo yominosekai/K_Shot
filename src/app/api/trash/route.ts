@@ -36,9 +36,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { type, original_id, original_path, original_name, user_sid, original_folder_path } = body;
+    const { type, original_id, original_path, original_name, user_id, original_folder_path } = body;
 
-    if (!type || !original_id || !original_path || !original_name || !user_sid) {
+    if (!type || !original_id || !original_path || !original_name || !user_id) {
       return NextResponse.json(
         {
           success: false,
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       original_id,
       fullPath,
       original_name,
-      user_sid,
+      user_id,
       original_folder_path
     );
 
@@ -95,6 +95,18 @@ export async function POST(request: NextRequest) {
         // SQLite削除に失敗しても、ゴミ箱への移動は成功しているので、エラーを返さない
         // （既にゴミ箱に移動済みの可能性があるため）
       }
+
+      // 削除を実行したユーザーのお気に入りから削除
+      try {
+        const { removeMaterialFromUserBookmarks } = await import('@/shared/lib/data-access/bookmarks');
+        const removed = await removeMaterialFromUserBookmarks(user_id, original_id);
+        if (removed) {
+          info(MODULE_NAME, `ユーザーのお気に入りから削除: userId=${user_id}, materialId=${original_id}`);
+        }
+      } catch (err) {
+        error(MODULE_NAME, 'お気に入りからの削除に失敗:', err);
+        // お気に入り削除に失敗しても、ゴミ箱への移動は成功しているので、エラーを返さない
+      }
     } else if (type === 'folder') {
       // foldersテーブルから削除（再帰的に子フォルダとフォルダ内の資料も削除）
       const { getDatabase } = await import('@/shared/lib/database/db');
@@ -114,9 +126,13 @@ export async function POST(request: NextRequest) {
             `${folderPath}/%`
           ) as Array<{ id: string }>;
           
+          // 削除を実行したユーザーのお気に入りから削除するための資料IDリスト
+          const materialIdsToRemove: string[] = [];
+          
           for (const material of materialsInFolder) {
             const deleteMaterialStmt = db.prepare('DELETE FROM materials WHERE id = ?');
             deleteMaterialStmt.run(material.id);
+            materialIdsToRemove.push(material.id);
             debug(MODULE_NAME, `フォルダ内の資料を削除: material_id=${material.id}`);
           }
           
@@ -152,6 +168,7 @@ export async function POST(request: NextRequest) {
               for (const material of materialsInSubfolder) {
                 const deleteMaterialStmt = db.prepare('DELETE FROM materials WHERE id = ?');
                 deleteMaterialStmt.run(material.id);
+                materialIdsToRemove.push(material.id);
                 debug(MODULE_NAME, `サブフォルダ内の資料を削除: material_id=${material.id}`);
               }
             }
@@ -166,6 +183,26 @@ export async function POST(request: NextRequest) {
           const result = deleteStmt.run(original_id);
           
           debug(MODULE_NAME, `SQLiteからフォルダを削除: original_id=${original_id}, 削除されたサブフォルダ数=${subfolderIds.length}, 削除された資料数=${materialsInFolder.length}`);
+          
+          // 削除を実行したユーザーのお気に入りから、フォルダ内の全資料を削除
+          if (materialIdsToRemove.length > 0) {
+            try {
+              const { removeMaterialFromUserBookmarks } = await import('@/shared/lib/data-access/bookmarks');
+              let removedCount = 0;
+              for (const materialId of materialIdsToRemove) {
+                const removed = await removeMaterialFromUserBookmarks(user_id, materialId);
+                if (removed) {
+                  removedCount++;
+                }
+              }
+              if (removedCount > 0) {
+                info(MODULE_NAME, `ユーザーのお気に入りから削除: userId=${user_id}, 削除資料数=${removedCount}/${materialIdsToRemove.length}`);
+              }
+            } catch (err) {
+              error(MODULE_NAME, 'お気に入りからの削除に失敗:', err);
+              // お気に入り削除に失敗しても、ゴミ箱への移動は成功しているので、エラーを返さない
+            }
+          }
         }
       } catch (err) {
         error(MODULE_NAME, 'SQLiteからのフォルダ削除に失敗:', err);

@@ -8,13 +8,13 @@ const MODULE_NAME = 'likes';
 /**
  * 複数資料のいいね状態を一括取得
  * @param materialIds 資料IDの配列
- * @param userSid ユーザーSID
+ * @param userId ユーザーID（UUID）
  * @returns いいね済みの資料IDのSet
  */
-export function getLikeStatuses(materialIds: string[], userSid: string): Set<string> {
+export function getLikeStatuses(materialIds: string[], userId: string): Set<string> {
   const likedMaterialIds = new Set<string>();
 
-  if (materialIds.length === 0 || !userSid) {
+  if (materialIds.length === 0 || !userId) {
     return likedMaterialIds;
   }
 
@@ -26,10 +26,10 @@ export function getLikeStatuses(materialIds: string[], userSid: string): Set<str
     const query = `
       SELECT material_id
       FROM material_likes
-      WHERE material_id IN (${placeholders}) AND user_sid = ?
+      WHERE material_id IN (${placeholders}) AND user_id = ?
     `;
     
-    const results = db.prepare(query).all(...materialIds, userSid) as Array<{
+    const results = db.prepare(query).all(...materialIds, userId) as Array<{
       material_id: string;
     }>;
     

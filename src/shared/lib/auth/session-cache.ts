@@ -23,9 +23,9 @@ function cleanupCache(): void {
   const now = Date.now();
   let cleanedCount = 0;
 
-  for (const [sid, entry] of cache.entries()) {
+  for (const [id, entry] of cache.entries()) {
     if (entry.expiresAt < now) {
-      cache.delete(sid);
+      cache.delete(id);
       cleanedCount++;
     }
   }
@@ -44,50 +44,50 @@ if (typeof setInterval !== 'undefined') {
 
 /**
  * 認証結果をキャッシュに保存
- * @param sid ユーザーSID
+ * @param userId ユーザーID
  * @param user ユーザー情報
  */
-export function setAuthCache(sid: string, user: User): void {
+export function setAuthCache(userId: string, user: User): void {
   const expiresAt = Date.now() + CACHE_TTL_MS;
-  cache.set(sid, {
+  cache.set(userId, {
     user,
     expiresAt,
   });
-  debug(MODULE_NAME, `認証結果をキャッシュに保存: sid=${sid}, expiresAt=${new Date(expiresAt).toISOString()}`);
+  debug(MODULE_NAME, `認証結果をキャッシュに保存: userId=${userId}, expiresAt=${new Date(expiresAt).toISOString()}`);
 }
 
 /**
  * 認証結果をキャッシュから取得
- * @param sid ユーザーSID
+ * @param userId ユーザーID
  * @returns ユーザー情報（キャッシュに存在し、有効期限内の場合）、それ以外はnull
  */
-export function getAuthCache(sid: string): User | null {
-  const entry = cache.get(sid);
+export function getAuthCache(userId: string): User | null {
+  const entry = cache.get(userId);
 
   if (!entry) {
-    debug(MODULE_NAME, `キャッシュに存在しない: sid=${sid}`);
+    debug(MODULE_NAME, `キャッシュに存在しない: userId=${userId}`);
     return null;
   }
 
   const now = Date.now();
   if (entry.expiresAt < now) {
     // 期限切れの場合は削除
-    cache.delete(sid);
-    debug(MODULE_NAME, `キャッシュが期限切れ: sid=${sid}`);
+    cache.delete(userId);
+    debug(MODULE_NAME, `キャッシュが期限切れ: userId=${userId}`);
     return null;
   }
 
-  debug(MODULE_NAME, `キャッシュから取得: sid=${sid}, 残り時間=${Math.round((entry.expiresAt - now) / 1000 / 60)}分`);
+  debug(MODULE_NAME, `キャッシュから取得: userId=${userId}, 残り時間=${Math.round((entry.expiresAt - now) / 1000 / 60)}分`);
   return entry.user;
 }
 
 /**
  * 認証結果をキャッシュから削除
- * @param sid ユーザーSID
+ * @param userId ユーザーID
  */
-export function clearAuthCache(sid: string): void {
-  if (cache.delete(sid)) {
-    debug(MODULE_NAME, `キャッシュを削除: sid=${sid}`);
+export function clearAuthCache(userId: string): void {
+  if (cache.delete(userId)) {
+    debug(MODULE_NAME, `キャッシュを削除: userId=${userId}`);
   }
 }
 
@@ -105,15 +105,15 @@ export function clearAllAuthCache(): void {
  */
 export function getCacheStats(): {
   size: number;
-  entries: Array<{ sid: string; expiresAt: string; remainingMinutes: number }>;
+  entries: Array<{ userId: string; expiresAt: string; remainingMinutes: number }>;
 } {
   const now = Date.now();
-  const entries: Array<{ sid: string; expiresAt: string; remainingMinutes: number }> = [];
+  const entries: Array<{ userId: string; expiresAt: string; remainingMinutes: number }> = [];
 
-  for (const [sid, entry] of cache.entries()) {
+  for (const [userId, entry] of cache.entries()) {
     if (entry.expiresAt >= now) {
       entries.push({
-        sid,
+        userId,
         expiresAt: new Date(entry.expiresAt).toISOString(),
         remainingMinutes: Math.round((entry.expiresAt - now) / 1000 / 60),
       });

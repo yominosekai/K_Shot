@@ -13,16 +13,16 @@ const MODULE_NAME = 'api/notifications/all';
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
-    const { user_sid } = body;
+    const { user_id } = body;
 
-    if (!user_sid) {
+    if (!user_id) {
       return NextResponse.json(
         { success: false, error: 'ユーザー情報が取得できません' },
         { status: 400 }
       );
     }
 
-    const deletedCount = await deleteAllNotifications(user_sid);
+    const deletedCount = await deleteAllNotifications(user_id);
 
     return NextResponse.json({
       success: true,

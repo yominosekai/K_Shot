@@ -26,7 +26,7 @@ describe('TokenAuthMigration', () => {
      */
   });
 
-  it.todo('requireAuth が SID ではなく証明ファイル由来の token を参照する', () => {
+  it.todo('requireAuth がユーザーIDではなく証明ファイル由来の token を参照する', () => {
     /**
      * 期待:
      *  - whoami 呼び出しが行われない
@@ -70,7 +70,7 @@ describe('TokenAuthMigration', () => {
   it.todo('user_id へ移行後も既存データの整合性が保たれる（マイグレーションテスト）', () => {
     /**
      * 期待:
-     *  - 既存の user_sid 付きレコードを移行スクリプトで更新し、外部キー制約が成立する
+     *  - 既存のユーザーID付きレコードを移行スクリプトで更新し、外部キー制約が成立する
      *  - material_likes 等の集計結果が変わらない
      */
   });

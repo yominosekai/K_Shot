@@ -3,6 +3,7 @@ import { updateUserData } from '@/shared/lib/data-access/users';
 import { requireOwnerOrAdmin } from '@/shared/lib/auth/middleware';
 import { info, error, debug } from '@/shared/lib/logger';
 import { saveAvatar, deleteAvatar } from '@/shared/lib/file-system/avatar';
+import { invalidateAvatarCache } from '@/shared/lib/cache/avatar-cache';
 
 const MODULE_NAME = 'api/profile/update';
 
@@ -64,16 +65,19 @@ export async function POST(request: NextRequest) {
 
     // アバター画像の処理
     const avatarFile = formData.get('avatar') as File | null;
+    let avatarUpdated = false;
     if (avatarFile && avatarFile.size > 0) {
       // ファイルがアップロードされた場合
       const arrayBuffer = await avatarFile.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       const avatarPath = await saveAvatar(userId, buffer);
       updateData.avatar = avatarPath;
+      avatarUpdated = true;
     } else if (formData.get('avatar') === '') {
       // 空文字列が送信された場合はアバター削除
       await deleteAvatar(userId);
       updateData.avatar = '';
+      avatarUpdated = true;
     }
 
     debug(MODULE_NAME, 'プロフィール更新リクエスト受信', {
@@ -85,6 +89,12 @@ export async function POST(request: NextRequest) {
     const result = await updateUserData(userId, updateData);
 
     if (result) {
+      // アバターが更新された場合はサーバー側キャッシュを無効化
+      if (avatarUpdated) {
+        invalidateAvatarCache(userId);
+        debug(MODULE_NAME, 'アバター更新によりサーバー側キャッシュを無効化', { userId });
+      }
+
       info(MODULE_NAME, 'プロフィール更新成功', {
         userId,
         hasAvatar: !!result.avatar,

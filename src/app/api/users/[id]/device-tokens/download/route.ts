@@ -7,15 +7,15 @@ import { requireAdmin } from '@/shared/lib/auth/middleware';
 import { signToken } from '@/shared/lib/auth/device-token';
 import { error, debug } from '@/shared/lib/logger';
 
-const MODULE_NAME = 'api/users/[sid]/device-tokens/download';
+const MODULE_NAME = 'api/users/[id]/device-tokens/download';
 
 /**
- * GET /api/users/[sid]/device-tokens/download?token=...
+ * GET /api/users/[id]/device-tokens/download?token=...
  * 指定されたデバイストークンの証明ファイルをダウンロード（管理者のみ）
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 管理者権限チェック
@@ -24,8 +24,8 @@ export async function GET(
       return authResult.response;
     }
 
-    const { sid } = await params;
-    const decodedSid = decodeURIComponent(sid);
+    const { id } = await params;
+    const decodedUserId = decodeURIComponent(id);
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
 
@@ -37,7 +37,7 @@ export async function GET(
     }
 
     // ユーザーが存在するか確認
-    const user = await getUserData(decodedSid);
+    const user = await getUserData(decodedUserId);
     if (!user) {
       return NextResponse.json(
         { success: false, error: 'ユーザーが見つかりません' },
@@ -48,24 +48,26 @@ export async function GET(
     const db = getDatabase();
 
     // トークンが存在し、該当ユーザーに紐づいているか確認
-    const tokenRecord = db.prepare(
-      `SELECT 
+    const tokenRecord = db
+      .prepare(
+        `SELECT 
         token,
-        user_sid,
+        user_id,
         signature,
         device_label,
         issued_at,
         signature_version
        FROM device_tokens
-       WHERE token = ? AND user_sid = ?`
-    ).get(token, decodedSid) as {
-      token: string;
-      user_sid: string;
-      signature: string;
-      device_label: string | null;
-      issued_at: string;
-      signature_version: number;
-    } | undefined;
+       WHERE token = ? AND user_id = ?`
+      )
+      .get(token, decodedUserId) as {
+        token: string;
+        user_id: string;
+        signature: string;
+        device_label: string | null;
+        issued_at: string;
+        signature_version: number;
+      } | undefined;
 
     if (!tokenRecord) {
       return NextResponse.json(
@@ -79,7 +81,7 @@ export async function GET(
       schema_version: '1.0.0',
       token: tokenRecord.token,
       signature: tokenRecord.signature,
-      user_sid: tokenRecord.user_sid,
+      user_id: tokenRecord.user_id,
       issued_at: tokenRecord.issued_at,
       device_label: tokenRecord.device_label || undefined,
       signature_version: tokenRecord.signature_version || 1,
@@ -87,7 +89,7 @@ export async function GET(
 
     const jsonContent = JSON.stringify(deviceTokenFile, null, 2);
 
-    debug(MODULE_NAME, `証明ファイルをダウンロード: token=${token}, user_sid=${decodedSid}`);
+    debug(MODULE_NAME, `証明ファイルをダウンロード: token=${token}, user_id=${decodedUserId}`);
 
     // JSONファイルとしてダウンロード
     return new NextResponse(jsonContent, {
@@ -104,6 +106,4 @@ export async function GET(
     );
   }
 }
-
-
 

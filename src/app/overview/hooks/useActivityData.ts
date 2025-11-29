@@ -34,11 +34,11 @@ export function useActivityData(options: UseActivityDataOptions = {}) {
     }
   }, []);
 
-  const fetchIndividualData = useCallback(async (userSid: string, period: Period = '1month', customRange?: CustomDateRange) => {
+  const fetchIndividualData = useCallback(async (userId: string, period: Period = '1month', customRange?: CustomDateRange) => {
     try {
       setLoading(true);
       setError(null);
-      let url = `/api/activity/stats?type=individual&userSid=${userSid}&period=${period}`;
+      let url = `/api/activity/stats?type=individual&userId=${userId}&period=${period}`;
       if (period === 'custom' && customRange) {
         url += `&startDate=${customRange.startDate}&endDate=${customRange.endDate}`;
       }

@@ -102,7 +102,7 @@ export async function saveFeedback(userId: string, content: string, isPublic: bo
 
     // DBメタデータに保存（集計用）
     db.prepare(`
-      INSERT INTO feedback_metadata (id, user_sid, created_date, updated_date, is_public, status)
+      INSERT INTO feedback_metadata (id, user_id, created_date, updated_date, is_public, status)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(feedbackId, userId, now, now, isPublic ? 1 : 0, 'open');
 
@@ -134,7 +134,7 @@ export async function getUserFeedbacks(userId: string): Promise<Feedback[]> {
  */
 interface FeedbackMetadataRow {
   id: string;
-  user_sid: string;
+  user_id: string;
   created_date: string;
   updated_date: string;
   is_public: number;
@@ -153,7 +153,7 @@ export function getAllFeedbackMetadata(): FeedbackMetadataRow[] {
     const query = db.prepare(`
       SELECT 
         fm.id,
-        fm.user_sid,
+        fm.user_id,
         fm.created_date,
         fm.updated_date,
         fm.is_public,
@@ -164,7 +164,7 @@ export function getAllFeedbackMetadata(): FeedbackMetadataRow[] {
         u.username,
         u.display_name
       FROM feedback_metadata fm
-      LEFT JOIN users u ON fm.user_sid = u.sid
+      LEFT JOIN users u ON fm.user_id = u.id
       ORDER BY fm.created_date DESC
     `);
 
@@ -192,7 +192,7 @@ export async function getFeedbackDetail(feedbackId: string, userId: string): Pro
  * 公開フィードバックをページネーション付きで取得
  */
 type PublicFeedback = Feedback & {
-  user_sid: string;
+  user_id: string;
   username?: string;
   display_name?: string;
 };
@@ -216,7 +216,7 @@ export async function getAllPublicFeedbacksPaginated(
     const metadataQuery = db.prepare(`
       SELECT 
         fm.id,
-        fm.user_sid,
+        fm.user_id,
         fm.created_date,
         fm.updated_date,
         fm.is_public,
@@ -227,7 +227,7 @@ export async function getAllPublicFeedbacksPaginated(
         u.username,
         u.display_name
       FROM feedback_metadata fm
-      LEFT JOIN users u ON fm.user_sid = u.sid
+      LEFT JOIN users u ON fm.user_id = u.id
       WHERE fm.is_public = 1
       ORDER BY fm.created_date DESC
       LIMIT ? OFFSET ?
@@ -254,7 +254,7 @@ export async function getAllPublicFeedbacksPaginated(
 
     const feedbacks = await Promise.all(
       metadata.map(async (meta) => {
-        const collection = await loadFeedbacks(meta.user_sid);
+        const collection = await loadFeedbacks(meta.user_id);
         const detail = collection.find((item) => item.id === meta.id);
         if (!detail) {
           debug(MODULE_NAME, `metadataに対応する詳細が見つかりません: feedbackId=${meta.id}`);
@@ -262,7 +262,7 @@ export async function getAllPublicFeedbacksPaginated(
         }
         return {
           ...detail,
-          user_sid: meta.user_sid,
+          user_id: meta.user_id,
           username: meta.username,
           display_name: meta.display_name,
         };

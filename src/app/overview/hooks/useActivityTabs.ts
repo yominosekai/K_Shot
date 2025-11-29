@@ -33,7 +33,7 @@ export function useActivityTabs({ activeTab, onTabChange }: UseActivityTabsOptio
   useEffect(() => {
     if (activeTab === 'individual' && selectedUser) {
       fetchIndividualData(
-        selectedUser.userSid,
+        selectedUser.userId,
         activityPeriod,
         activityPeriod === 'custom' ? customDateRange : undefined
       );

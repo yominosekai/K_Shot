@@ -12,7 +12,6 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (sid: string) => Promise<void>;
   logout: () => void;
   checkPermission: (permission: string) => boolean;
   updateUser: (updatedUser: User) => void;
@@ -46,11 +45,11 @@ const isLastLoginToday = (lastLogin: string | undefined): boolean => {
   }
 };
 
-const getUserId = (user?: { id?: string; sid?: string } | null): string | null => {
+const getUserId = (user?: { id?: string } | null): string | null => {
   if (!user) {
     return null;
   }
-  return user.id ?? user.sid ?? null;
+  return user.id ?? null;
 };
 
 // セッションからユーザーを復元するヘルパー関数
@@ -80,7 +79,6 @@ const restoreUserFromCache = async (
       if (profileData.success && profileData.profile) {
         const mergedUser: User = {
           id: sessionUserId,
-          sid: existingSession.sid ?? sessionUserId,
           username: existingSession.username,
           display_name: existingSession.display_name,
           email: existingSession.email,
@@ -115,7 +113,6 @@ const restoreUserFromSession = (existingSession: SessionUser): User => {
   const sessionUserId = getUserId(existingSession) ?? crypto.randomUUID();
   return {
     id: sessionUserId,
-    sid: existingSession.sid ?? sessionUserId,
     username: existingSession.username,
     display_name: existingSession.display_name,
     email: existingSession.email,
@@ -229,8 +226,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
 
           const data = await response.json();
-          if (data.success && data.user) {
-            sessionManager.setSession(data.user);
+        if (data.success && data.user) {
+          sessionManager.setSession(data.user);
             React.startTransition(() => {
               setUser(data.user);
               setIsLoading(false);
@@ -253,31 +250,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     autoAuthenticate();
   }, []);
-
-  const login = async (sid: string): Promise<void> => {
-    const response = await fetch('/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sid }),
-    });
-
-    if (!response.ok) {
-      throw new Error('ログインに失敗しました');
-    }
-
-    const data = await response.json();
-    if (!data.success || !data.user) {
-      throw new Error('ユーザーが見つかりません');
-    }
-
-    const sessionManager = SessionManager.getInstance();
-    sessionManager.setSession(data.user);
-    setUserInCache(getUserId(data.user) ?? '', data.user);
-
-    React.startTransition(() => {
-      setUser(data.user);
-    });
-  };
 
   const logout = (): void => {
     const sessionManager = SessionManager.getInstance();
@@ -302,7 +274,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     isAuthenticated: !!user,
     isLoading,
-    login,
     logout,
     checkPermission: checkUserPermission,
     updateUser,

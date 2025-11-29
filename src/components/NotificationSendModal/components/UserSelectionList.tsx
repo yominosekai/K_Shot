@@ -8,19 +8,19 @@ import type { User as UserType } from '@/features/auth/types';
 
 interface UserSelectionListProps {
   users: UserType[];
-  selectedUserSids: Set<string>;
-  onUserToggle: (userSid: string) => void;
-  targetUserSid?: string | null;
+  selectedUserIds: Set<string>;
+  onUserToggle: (userId: string) => void;
+  targetUserId?: string | null;
   onSelectAll?: () => void;
 }
 
-const resolveUserId = (user: UserType) => user.id ?? user.sid ?? '';
+const resolveUserId = (user: UserType) => user.id ?? '';
 
 export default function UserSelectionList({
   users,
-  selectedUserSids,
+  selectedUserIds,
   onUserToggle,
-  targetUserSid,
+  targetUserId,
   onSelectAll,
 }: UserSelectionListProps) {
   const { getAvatarUrl } = useUsers();
@@ -31,13 +31,13 @@ export default function UserSelectionList({
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           送信先
         </label>
-        {!targetUserSid && onSelectAll && (
+        {!targetUserId && onSelectAll && (
           <button
             type="button"
             onClick={onSelectAll}
             className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
           >
-            {selectedUserSids.size === users.length ? 'すべて解除' : 'すべて選択'}
+            {selectedUserIds.size === users.length ? 'すべて解除' : 'すべて選択'}
           </button>
         )}
       </div>
@@ -54,14 +54,14 @@ export default function UserSelectionList({
             <label
               key={userId}
               className={`flex items-center space-x-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                targetUserSid ? 'cursor-default' : 'cursor-pointer'
+                targetUserId ? 'cursor-default' : 'cursor-pointer'
               }`}
             >
               <input
                 type="checkbox"
-                checked={selectedUserSids.has(userId)}
+                checked={selectedUserIds.has(userId)}
                 onChange={() => onUserToggle(userId)}
-                disabled={targetUserSid !== null && targetUserSid !== undefined}
+                disabled={targetUserId !== null && targetUserId !== undefined}
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
               />
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
@@ -97,9 +97,9 @@ export default function UserSelectionList({
           })
         )}
       </div>
-      {selectedUserSids.size > 0 && (
+      {selectedUserIds.size > 0 && (
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {selectedUserSids.size}人に送信します
+          {selectedUserIds.size}人に送信します
         </p>
       )}
     </div>

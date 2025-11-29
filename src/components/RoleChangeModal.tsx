@@ -76,22 +76,22 @@ export default function RoleChangeModal({
     setError(null);
 
     try {
-      const targetUserId = selectedUser.id ?? selectedUser.sid;
+      const targetUserId = selectedUser.id;
       if (!targetUserId) {
         setError('対象ユーザーIDを特定できませんでした');
         return;
       }
-      const changerId = currentUser.sid ?? currentUser?.id;
+      const changerId = currentUser.id;
       if (!changerId) {
         setError('操作ユーザーIDを特定できませんでした');
         return;
       }
       // IDにハイフンが含まれるため、URLエンコードが必要
-      const encodedSid = encodeURIComponent(targetUserId);
+      const encodedId = encodeURIComponent(targetUserId);
       // 新しい権限が一般ユーザー以外（教育者・管理者）の場合はパスワードを送信
       const requiresPassword = newRole !== 'user';
       
-      const response = await fetch(`/api/users/${encodedSid}/role`, {
+      const response = await fetch(`/api/users/${encodedId}/role`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -172,7 +172,7 @@ export default function RoleChangeModal({
               <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold overflow-hidden">
                   {(() => {
-                    const avatarSourceId = selectedUser.id ?? selectedUser.sid;
+                    const avatarSourceId = selectedUser.id;
                     const avatarUrl = avatarSourceId ? getAvatarUrl(avatarSourceId) : null;
                     return avatarUrl ? (
                       <Image

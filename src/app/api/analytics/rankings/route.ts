@@ -82,23 +82,23 @@ export async function GET(request: NextRequest) {
       }>;
 
       // 作成者情報を一括取得
-      const creatorSids = [...new Set(results.map(r => r.created_by))];
-      if (creatorSids.length > 0) {
-        const placeholders = creatorSids.map(() => '?').join(',');
+      const creatorIds = [...new Set(results.map(r => r.created_by))];
+      if (creatorIds.length > 0) {
+        const placeholders = creatorIds.map(() => '?').join(',');
         const creators = db.prepare(`
-          SELECT sid, display_name, avatar FROM users 
-          WHERE sid IN (${placeholders})
-        `).all(...creatorSids) as Array<{
-          sid: string;
+          SELECT id, display_name, avatar FROM users 
+          WHERE id IN (${placeholders})
+        `).all(...creatorIds) as Array<{
+          id: string;
           display_name: string;
           avatar: string | null;
         }>;
 
         const creatorMap = new Map(
-          creators.map(c => [c.sid, c])
+          creators.map(c => [c.id, c])
         );
 
-        debug(MODULE_NAME, `作成者情報一括取得完了: ${results.length}件中${creatorSids.length}人の作成者`);
+        debug(MODULE_NAME, `作成者情報一括取得完了: ${results.length}件中${creatorIds.length}人の作成者`);
 
         for (const result of results) {
           const creator = creatorMap.get(result.created_by);
@@ -151,23 +151,23 @@ export async function GET(request: NextRequest) {
       const topRankings = rankingData.slice(0, limit);
 
       // 作成者情報を一括取得
-      const creatorSids = [...new Set(topRankings.map(r => r.createdBy))];
-      if (creatorSids.length > 0) {
-        const placeholders = creatorSids.map(() => '?').join(',');
+      const creatorIds = [...new Set(topRankings.map(r => r.createdBy))];
+      if (creatorIds.length > 0) {
+        const placeholders = creatorIds.map(() => '?').join(',');
         const creators = db.prepare(`
-          SELECT sid, display_name, avatar FROM users 
-          WHERE sid IN (${placeholders})
-        `).all(...creatorSids) as Array<{
-          sid: string;
+          SELECT id, display_name, avatar FROM users 
+          WHERE id IN (${placeholders})
+        `).all(...creatorIds) as Array<{
+          id: string;
           display_name: string;
           avatar: string | null;
         }>;
 
         const creatorMap = new Map(
-          creators.map(c => [c.sid, c])
+          creators.map(c => [c.id, c])
         );
 
-        debug(MODULE_NAME, `作成者情報一括取得完了: ${topRankings.length}件中${creatorSids.length}人の作成者`);
+        debug(MODULE_NAME, `作成者情報一括取得完了: ${topRankings.length}件中${creatorIds.length}人の作成者`);
 
         for (const item of topRankings) {
           const creator = creatorMap.get(item.createdBy);
@@ -213,23 +213,23 @@ export async function GET(request: NextRequest) {
       }>;
 
       // 作成者情報を一括取得
-      const creatorSids = [...new Set(results.map(r => r.created_by))];
-      if (creatorSids.length > 0) {
-        const placeholders = creatorSids.map(() => '?').join(',');
+      const creatorIds = [...new Set(results.map(r => r.created_by))];
+      if (creatorIds.length > 0) {
+        const placeholders = creatorIds.map(() => '?').join(',');
         const creators = db.prepare(`
-          SELECT sid, display_name, avatar FROM users 
-          WHERE sid IN (${placeholders})
-        `).all(...creatorSids) as Array<{
-          sid: string;
+          SELECT id, display_name, avatar FROM users 
+          WHERE id IN (${placeholders})
+        `).all(...creatorIds) as Array<{
+          id: string;
           display_name: string;
           avatar: string | null;
         }>;
 
         const creatorMap = new Map(
-          creators.map(c => [c.sid, c])
+          creators.map(c => [c.id, c])
         );
 
-        debug(MODULE_NAME, `作成者情報一括取得完了: ${results.length}件中${creatorSids.length}人の作成者`);
+        debug(MODULE_NAME, `作成者情報一括取得完了: ${results.length}件中${creatorIds.length}人の作成者`);
 
         for (const result of results) {
           const creator = creatorMap.get(result.created_by);

@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 必須フィールドの検証
-    const requiredFields = ['schema_version', 'token', 'signature', 'user_sid', 'issued_at'];
+    const requiredFields = ['schema_version', 'token', 'signature', 'user_id', 'issued_at'];
     for (const field of requiredFields) {
       if (!device_token_file[field]) {
         return NextResponse.json(
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       schema_version: device_token_file.schema_version,
       token: device_token_file.token,
       signature: device_token_file.signature,
-      user_sid: device_token_file.user_sid,
+      user_id: device_token_file.user_id,
       issued_at: device_token_file.issued_at,
       device_label: device_token_file.device_label,
       signature_version: device_token_file.signature_version || 1,
@@ -78,7 +78,10 @@ export async function POST(request: NextRequest) {
     // ローカルに証明ファイルを保存
     try {
       await writeDeviceToken(tokenFile);
-      debug(MODULE_NAME, `証明ファイルをインポートしました: token=${tokenFile.token}, user_sid=${tokenFile.user_sid}`);
+      debug(
+        MODULE_NAME,
+        `証明ファイルをインポートしました: token=${tokenFile.token}, user_id=${tokenFile.user_id}`
+      );
     } catch (writeError) {
       error(MODULE_NAME, '証明ファイルの保存に失敗しました:', writeError);
       return NextResponse.json(

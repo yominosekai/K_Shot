@@ -22,11 +22,11 @@ export function useCreatorCache() {
       let hasChanges = false;
 
       // UsersContextに存在するユーザー情報でcreatorCacheを更新
-      users.forEach((user, sid) => {
-        const cachedUser = prevCache.get(sid);
+      users.forEach((user, id) => {
+        const cachedUser = prevCache.get(id);
         // キャッシュにない、または更新されている場合は更新
         if (!cachedUser || cachedUser !== user) {
-          newCache.set(sid, user);
+          newCache.set(id, user);
           hasChanges = true;
         }
       });
@@ -39,31 +39,31 @@ export function useCreatorCache() {
   const fetchCreators = useCallback(
     async (materials: MaterialNormalized[]) => {
       try {
-        const creatorSids = new Set(
+        const creatorIds = new Set(
           materials
             .map((m) => m.created_by)
-            .filter((sid): sid is string => Boolean(sid))
+            .filter((id): id is string => Boolean(id))
         );
 
-        if (creatorSids.size === 0) {
+        if (creatorIds.size === 0) {
           return;
         }
 
-        const sidsToFetch = Array.from(creatorSids).filter(
-          (sid) => !creatorCacheRef.current.has(sid)
+        const idsToFetch = Array.from(creatorIds).filter(
+          (id) => !creatorCacheRef.current.has(id)
         );
 
-        if (sidsToFetch.length === 0) {
+        if (idsToFetch.length === 0) {
           return;
         }
 
-        const fetched = await getUsers(sidsToFetch);
+        const fetched = await getUsers(idsToFetch);
 
         setCreatorCache((prevCache) => {
           const newCache = new Map(prevCache);
-          fetched.forEach((user, sid) => {
+          fetched.forEach((user, id) => {
             if (user) {
-              newCache.set(sid, user);
+              newCache.set(id, user);
             }
           });
           return newCache;

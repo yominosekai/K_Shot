@@ -22,10 +22,9 @@ export class SessionManager {
    * UserからSessionUserに変換（軽量化）
    */
   private toSessionUser(user: User): SessionUser {
-    const canonicalId = user.id ?? user.sid;
+    const canonicalId = user.id;
     return {
       id: canonicalId || 'unknown',
-      sid: user.sid || canonicalId,
       username: user.username,
       display_name: user.display_name,
       email: user.email,

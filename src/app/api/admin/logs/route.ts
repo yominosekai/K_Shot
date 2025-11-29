@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readErrorLog, readBusyLog } from '@/shared/lib/database/busy-monitor';
 import { getUserData } from '@/shared/lib/data-access/users';
-import { authenticateUser } from '@/features/auth/api/auth';
+import { requireAdmin } from '@/shared/lib/auth/middleware';
 import { error } from '@/shared/lib/logger';
 
 const MODULE_NAME = 'api/admin/logs';
@@ -14,33 +14,22 @@ const MODULE_NAME = 'api/admin/logs';
  */
 export async function GET(request: NextRequest) {
   try {
-    // 認証チェック
-    const authResult = await authenticateUser();
-    if (!authResult.success || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: '認証が必要です' },
-        { status: 401 }
-      );
-    }
-
-    // 管理者権限チェック
-    if (authResult.user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: '管理者権限が必要です' },
-        { status: 403 }
-      );
+    // 認証・管理者権限チェック
+    const authResult = await requireAdmin();
+    if (!authResult.success) {
+      return authResult.response;
     }
 
     const { searchParams } = new URL(request.url);
-    const userSidParam = searchParams.get('user_sid');
+    const userIdParam = searchParams.get('user_id');
     const logType = searchParams.get('type') || 'all'; // 'errors', 'busy', 'all'
-    const userSid = userSidParam || undefined;
+    const userId = userIdParam || undefined;
     
     const entries: Array<Record<string, any>> = [];
     
     // エラーログを取得
     if (logType === 'errors' || logType === 'all') {
-      const errorLogs = readErrorLog(userSid, 0); // 全件取得
+      const errorLogs = readErrorLog(userId, 0); // 全件取得
       errorLogs.forEach(log => {
         entries.push({
           ...log,
@@ -51,7 +40,7 @@ export async function GET(request: NextRequest) {
     
     // SQLITE_BUSYログを取得
     if (logType === 'busy' || logType === 'all') {
-      const busyLogs = readBusyLog(userSid, 0); // 全件取得
+      const busyLogs = readBusyLog(userId, 0); // 全件取得
       busyLogs.forEach(log => {
         entries.push({
           ...log,
@@ -68,20 +57,20 @@ export async function GET(request: NextRequest) {
     });
     
     // ユーザー情報を取得して表示名を追加
-    const userSids = new Set<string>();
-    entries.forEach(entry => {
-      const sid = entry.user_sid || entry.userSid;
-      if (sid) {
-        userSids.add(sid);
+    const userIds = new Set<string>();
+    entries.forEach((entry) => {
+      const id = entry.user_id || entry.userId;
+      if (id) {
+        userIds.add(id);
       }
     });
     
     const userMap = new Map<string, { display_name: string; username: string }>();
-    for (const sid of userSids) {
+    for (const id of userIds) {
       try {
-        const user = await getUserData(sid);
+        const user = await getUserData(id);
         if (user) {
-          userMap.set(sid, {
+          userMap.set(id, {
             display_name: user.display_name,
             username: user.username,
           });
@@ -92,12 +81,12 @@ export async function GET(request: NextRequest) {
     }
     
     // ユーザー情報を追加
-    const entriesWithUserInfo = entries.map(entry => {
-      const sid = entry.user_sid || entry.userSid;
-      const userInfo = sid ? userMap.get(sid) : null;
+    const entriesWithUserInfo = entries.map((entry) => {
+      const id = entry.user_id || entry.userId;
+      const userInfo = id ? userMap.get(id) : null;
       return {
         ...entry,
-        userDisplayName: userInfo?.display_name || sid || '不明',
+        userDisplayName: userInfo?.display_name || id || '不明',
         userUsername: userInfo?.username || '',
       };
     });

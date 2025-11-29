@@ -14,6 +14,7 @@ import NotificationSendModal from '@/components/NotificationSendModal';
 import Toast from '@/components/Toast';
 import { useUserFiltering } from '@/shared/hooks/useUserFiltering';
 import type { User } from '@/features/auth/types';
+import { useUsers } from '@/contexts/UsersContext';
 
 type ViewMode = 'grid' | 'list';
 
@@ -30,6 +31,9 @@ export default function MembersPage() {
   const [isToastVisible, setIsToastVisible] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [notificationTargetUser, setNotificationTargetUser] = useState<User | null>(null);
+
+  // UsersContext（アバターURL用のキャッシュ）と同期するために使用
+  const { setUser } = useUsers();
 
   // フィルタリングロジック
   const {
@@ -63,7 +67,16 @@ export default function MembersPage() {
 
       const data = await response.json();
       if (data.success) {
-        setUsers(data.users || []);
+        const fetchedUsers: User[] = data.users || [];
+        setUsers(fetchedUsers);
+
+        // UsersContextのキャッシュにも反映しておくことで、
+        // getAvatarUrlが初回アクセス時から利用者一覧でも機能するようにする
+        fetchedUsers.forEach((user: User) => {
+          if (user.id) {
+            setUser(user.id, user);
+          }
+        });
       } else {
         throw new Error(data.error || 'ユーザー一覧の取得に失敗しました');
       }
@@ -277,7 +290,7 @@ export default function MembersPage() {
             >
               {filteredUsers.map((user) =>
                 viewMode === 'grid' ? (
-                  <div key={user.sid} data-user-item>
+                  <div key={user.id} data-user-item>
                     <UserCard 
                       user={user} 
                       onClick={() => handleUserClick(user)}
@@ -285,7 +298,7 @@ export default function MembersPage() {
                     />
                   </div>
                 ) : (
-                  <div key={user.sid} data-user-item>
+                  <div key={user.id} data-user-item>
                     <UserListItem 
                       user={user} 
                       onClick={() => handleUserClick(user)}
@@ -320,7 +333,7 @@ export default function MembersPage() {
             setIsNotificationModalOpen(false);
             setNotificationTargetUser(null);
           }}
-          targetUserSid={notificationTargetUser?.sid || null}
+          targetUserId={notificationTargetUser?.id || null}
           onSuccess={() => {
             setToastMessage('メッセージを送信しました');
             setIsToastVisible(true);

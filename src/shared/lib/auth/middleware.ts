@@ -32,12 +32,12 @@ export interface AuthError {
  */
 export async function requireAuth(): Promise<AuthResult | AuthError> {
   try {
-    // Windows環境からSIDを取得
-    const { getCurrentUserSID } = await import('@/features/auth/api/auth');
-    const sid = await getCurrentUserSID();
+    // デバイストークンからユーザーIDを取得
+    const { getCurrentUserId } = await import('@/features/auth/api/auth');
+    const userId = await getCurrentUserId();
 
-    if (!sid) {
-      error(MODULE_NAME, 'requireAuth: SIDを取得できませんでした');
+    if (!userId) {
+      error(MODULE_NAME, 'requireAuth: ユーザーIDを取得できませんでした');
       return {
         success: false,
         response: NextResponse.json(
@@ -48,9 +48,9 @@ export async function requireAuth(): Promise<AuthResult | AuthError> {
     }
 
     // キャッシュから取得を試みる
-    const cachedUser = getAuthCache(sid);
+    const cachedUser = getAuthCache(userId);
     if (cachedUser) {
-      debug(MODULE_NAME, `requireAuth: キャッシュから取得: sid=${sid}`);
+      debug(MODULE_NAME, `requireAuth: キャッシュから取得: userId=${userId}`);
       return {
         success: true,
         user: cachedUser,
@@ -58,7 +58,7 @@ export async function requireAuth(): Promise<AuthResult | AuthError> {
     }
 
     // キャッシュにない場合は認証処理を実行
-    debug(MODULE_NAME, `requireAuth: 認証処理を実行: sid=${sid}`);
+    debug(MODULE_NAME, `requireAuth: 認証処理を実行: userId=${userId}`);
     let authResult;
     try {
       authResult = await authenticateUser();
@@ -89,7 +89,7 @@ export async function requireAuth(): Promise<AuthResult | AuthError> {
     }
 
     // 認証成功時はキャッシュに保存
-    setAuthCache(sid, authResult.user);
+    setAuthCache(userId, authResult.user);
 
     return {
       success: true,
@@ -155,25 +155,17 @@ export async function requireRole(
     return authResult;
   }
 
-  const initialUser = authResult.user;
+  const user = authResult.user;
 
-  if (hasPermission(initialUser, permission)) {
+  if (hasPermission(user, permission)) {
     return authResult;
   }
 
-  const refreshedUser = await refreshAuthUser(initialUser.sid ?? initialUser.id);
-
-  if (refreshedUser && hasPermission(refreshedUser, permission)) {
-    return {
-      success: true,
-      user: refreshedUser,
-    };
-  }
-
-  const actualRole = refreshedUser?.role ?? initialUser.role;
+  // 権限が不足している場合
+  // 権限変更時にはキャッシュをクリアしているため、キャッシュから取得した情報で判断
   error(
     MODULE_NAME,
-    `requireRole: 権限不足: sid=${initialUser.sid}, required=${permission}, actual=${actualRole}`
+    `requireRole: 権限不足: userId=${user.id}, required=${permission}, actual=${user.role}`
   );
   return {
     success: false,
@@ -202,11 +194,11 @@ export async function requireInstructor(): Promise<AuthResult | AuthError> {
 
 /**
  * 本人または管理者のみアクセス可能
- * @param targetSid 対象ユーザーのSID
+ * @param targetUserId 対象ユーザーのID
  * @returns 認証成功かつ本人または管理者の場合はユーザー情報、それ以外はNextResponse
  */
 export async function requireOwnerOrAdmin(
-  targetSid: string
+  targetUserId: string
 ): Promise<AuthResult | AuthError> {
   const authResult = await requireAuth();
 
@@ -217,11 +209,14 @@ export async function requireOwnerOrAdmin(
   const user = authResult.user;
 
   // 本人または管理者の場合は許可
-  if (user.sid === targetSid || isAdmin(user)) {
+  if (user.id === targetUserId || isAdmin(user)) {
     return authResult;
   }
 
-  error(MODULE_NAME, `requireOwnerOrAdmin: アクセス拒否: sid=${user.sid}, targetSid=${targetSid}`);
+  error(
+    MODULE_NAME,
+    `requireOwnerOrAdmin: アクセス拒否: userId=${user.id}, targetUserId=${targetUserId}`
+  );
   return {
     success: false,
     response: NextResponse.json(
@@ -231,21 +226,21 @@ export async function requireOwnerOrAdmin(
   };
 }
 
-async function refreshAuthUser(sid?: string): Promise<User | null> {
-  if (!sid) {
+async function refreshAuthUser(userId?: string): Promise<User | null> {
+  if (!userId) {
     return null;
   }
 
   try {
-    const user = await getUserData(sid);
+    const user = await getUserData(userId);
     if (user) {
-      setAuthCache(sid, user);
+      setAuthCache(userId, user);
       return user;
     }
-    clearAuthCache(sid);
+    clearAuthCache(userId);
     return null;
   } catch (err) {
-    error(MODULE_NAME, `refreshAuthUserエラー: sid=${sid}`, err);
+    error(MODULE_NAME, `refreshAuthUserエラー: userId=${userId}`, err);
     return null;
   }
 }

@@ -13,7 +13,7 @@ interface CommentItemProps {
   material: MaterialNormalized | null;
   depth: number;
   userCache: Map<string, any>;
-  currentUserSid?: string;
+  currentUserId?: string;
   editingCommentId: string | null;
   editContent: string;
   onEditContentChange: (content: string) => void;
@@ -29,7 +29,7 @@ export default function CommentItem({
   material,
   depth,
   userCache,
-  currentUserSid,
+  currentUserId,
   editingCommentId,
   editContent,
   onEditContentChange,
@@ -41,7 +41,7 @@ export default function CommentItem({
 }: CommentItemProps) {
   const { getAvatarUrl } = useUsers();
   const commentUser = userCache.get(comment.created_by);
-  const isOwnComment = comment.created_by === currentUserSid;
+  const isOwnComment = comment.created_by === currentUserId;
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString('ja-JP', {
@@ -59,7 +59,7 @@ export default function CommentItem({
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center space-x-2">
             {(() => {
-              const avatarUrl = commentUser?.sid ? getAvatarUrl(commentUser.sid) : null;
+              const avatarUrl = commentUser?.id ? getAvatarUrl(commentUser.id) : null;
               return avatarUrl ? (
                 <Image
                   src={avatarUrl}
@@ -216,7 +216,7 @@ export default function CommentItem({
         )}
 
         {/* 返信コメント */}
-        {comment.replies && comment.replies.length > 0 && (
+                {comment.replies && comment.replies.length > 0 && (
           <div className="mt-3 space-y-3">
             {comment.replies.map((reply) => (
               <CommentItem
@@ -225,7 +225,7 @@ export default function CommentItem({
                 material={material}
                 depth={depth + 1}
                 userCache={userCache}
-                currentUserSid={currentUserSid}
+                currentUserId={currentUserId}
                 editingCommentId={editingCommentId}
                 editContent={editContent}
                 onEditContentChange={onEditContentChange}

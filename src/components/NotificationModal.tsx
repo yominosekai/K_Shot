@@ -120,7 +120,7 @@ function useNotificationOperations(userId?: string, onNotificationRead?: () => v
         const response = await fetch(`/api/notifications/${notificationId}/read`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_sid: userId }),
+          body: JSON.stringify({ user_id: userId }),
         });
 
         if (response.ok) {
@@ -149,7 +149,7 @@ function useNotificationOperations(userId?: string, onNotificationRead?: () => v
       const response = await fetch('/api/notifications/all/read', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_sid: userId }),
+          body: JSON.stringify({ user_id: userId }),
       });
 
       if (response.ok) {
@@ -179,7 +179,7 @@ function useNotificationOperations(userId?: string, onNotificationRead?: () => v
         const response = await fetch(`/api/notifications/${notificationId}/unread`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_sid: userId }),
+          body: JSON.stringify({ user_id: userId }),
         });
 
         if (response.ok) {
@@ -208,9 +208,12 @@ function useNotificationOperations(userId?: string, onNotificationRead?: () => v
 
       setDeletingNotification(notificationId);
       try {
-        const response = await fetch(`/api/notifications/${notificationId}?user_sid=${encodeURIComponent(userId)}`, {
+        const response = await fetch(
+          `/api/notifications/${notificationId}?user_id=${encodeURIComponent(userId)}`,
+          {
           method: 'DELETE',
-        });
+          }
+        );
 
         if (response.ok) {
           const data = await response.json();
@@ -235,7 +238,7 @@ function useNotificationOperations(userId?: string, onNotificationRead?: () => v
       const response = await fetch('/api/notifications/all', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_sid: userId }),
+          body: JSON.stringify({ user_id: userId }),
       });
 
       if (response.ok) {
@@ -417,7 +420,7 @@ const NotificationItem = ({
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{notification.message}</p>
           <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-            <span>{notification.from_user_name || notification.from_user_sid}さんから</span>
+            <span>{notification.from_user_name || notification.from_user_id}さんから</span>
             {notification.material_title && <span className="truncate">資料: {notification.material_title}</span>}
             <span>{formatRelativeDate(notification.created_date)}</span>
           </div>

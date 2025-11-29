@@ -56,9 +56,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, parent_id, user_sid } = body;
+    const { name, parent_id, user_id } = body;
 
-    if (!name || !user_sid) {
+    if (!name || !user_id) {
       return NextResponse.json(
         {
           success: false,
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const folder = await createFolder(name, parent_id || '', user_sid);
+    const folder = await createFolder(name, parent_id || '', user_id);
 
     if (!folder) {
       return NextResponse.json(

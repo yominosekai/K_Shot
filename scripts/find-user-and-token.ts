@@ -13,13 +13,13 @@ try {
   // 「とみた」ユーザーを検索
   console.log('\n=== 「とみた」ユーザーを検索 ===');
   const users = db.prepare(`
-    SELECT sid, username, display_name, email, role, is_active, created_date, last_login
+    SELECT id, username, display_name, email, role, is_active, created_date, last_login
     FROM users
     WHERE LOWER(display_name) LIKE '%とみた%'
        OR LOWER(username) LIKE '%とみた%'
        OR LOWER(email) LIKE '%とみた%'
   `).all() as Array<{
-    sid: string;
+    id: string;
     username: string;
     display_name: string;
     email: string;
@@ -35,7 +35,7 @@ try {
     console.log(`\n見つかったユーザー数: ${users.length}`);
     users.forEach((user, index) => {
       console.log(`\n--- ユーザー ${index + 1} ---`);
-      console.log(`SID (UUID): ${user.sid}`);
+      console.log(`ID (UUID): ${user.id}`);
       console.log(`ユーザー名: ${user.username}`);
       console.log(`表示名: ${user.display_name}`);
       console.log(`メール: ${user.email}`);
@@ -53,9 +53,9 @@ try {
       const tokens = db.prepare(`
         SELECT token, signature, device_label, issued_at, last_used, status, signature_version
         FROM device_tokens
-        WHERE user_sid = ?
+        WHERE user_id = ?
         ORDER BY issued_at DESC
-      `).all(user.sid) as Array<{
+      `).all(user.id) as Array<{
         token: string;
         signature: string;
         device_label: string | null;
@@ -65,7 +65,7 @@ try {
         signature_version: number;
       }>;
 
-      console.log(`\nユーザー: ${user.display_name} (${user.sid})`);
+      console.log(`\nユーザー: ${user.display_name} (${user.id})`);
       if (tokens.length === 0) {
         console.log('  デバイストークンが見つかりませんでした。');
       } else {
@@ -87,12 +87,12 @@ try {
   // すべてのユーザーを一覧表示（参考用）
   console.log('\n\n=== すべてのユーザー一覧（参考） ===');
   const allUsers = db.prepare(`
-    SELECT sid, username, display_name, email, role
+    SELECT id, username, display_name, email, role
     FROM users
     ORDER BY created_date DESC
     LIMIT 20
   `).all() as Array<{
-    sid: string;
+    id: string;
     username: string;
     display_name: string;
     email: string;
@@ -101,7 +101,7 @@ try {
 
   console.log(`総ユーザー数（表示上限20件）: ${allUsers.length}`);
   allUsers.forEach((user, index) => {
-    console.log(`${index + 1}. ${user.display_name} (${user.username}) - ${user.sid}`);
+    console.log(`${index + 1}. ${user.display_name} (${user.username}) - ${user.id}`);
   });
 
   db.close();

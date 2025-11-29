@@ -2,7 +2,6 @@
 
 export interface User {
   id: string;
-  sid?: string; // legacy compatibility
   username: string;
   display_name: string;
   email: string;
@@ -24,7 +23,6 @@ export interface User {
  */
 export interface SessionUser {
   id: string;
-  sid?: string;
   username: string;
   display_name: string;
   email: string;

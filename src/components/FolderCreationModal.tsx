@@ -112,7 +112,7 @@ export default function FolderCreationModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!folderName.trim() || !user?.sid) return;
+    if (!folderName.trim() || !user?.id) return;
 
     // バリデーション
     const error = validateFolderName(folderName);
@@ -131,7 +131,7 @@ export default function FolderCreationModal({
         body: JSON.stringify({
           name: folderName.trim(),
           parent_id: parentId || '',
-          user_sid: user.sid,
+          user_id: user.id,
         }),
       });
 

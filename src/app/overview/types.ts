@@ -18,7 +18,7 @@ export interface OverallStats {
 }
 
 export interface UserDistribution {
-  userSid: string;
+  userId: string;
   displayName: string;
   viewCount: number;
   uniqueMaterials: number;
@@ -26,7 +26,7 @@ export interface UserDistribution {
 }
 
 export interface UserActivityStats {
-  userSid: string;
+  userId: string;
   displayName: string;
   loginCount: number;
   viewCount: number;

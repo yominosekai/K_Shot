@@ -118,7 +118,7 @@ export default function CommentModal({
             material={material}
             loading={loading}
             userCache={userCache}
-            currentUserSid={user?.sid}
+            currentUserId={user?.id}
             editingCommentId={editingCommentId}
             editContent={editContent}
             onEditContentChange={setEditContent}

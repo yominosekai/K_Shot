@@ -75,9 +75,9 @@ export async function GET(request: NextRequest) {
       filter.include_bookmark_counts = true;
     }
 
-    // いいね状態を取得するためにuser_sidを追加
-    if (authResult.user?.sid) {
-      filter.user_sid = authResult.user.sid;
+    // いいね状態を取得するためにuser_idを追加
+    if (authResult.user?.id) {
+      filter.user_id = authResult.user.id;
     }
 
     const materials = await getMaterials(filter);

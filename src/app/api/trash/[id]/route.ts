@@ -89,43 +89,62 @@ export async function PUT(
         // 資料の場合：同じIDの資料が既に存在するかチェック
         const existingMaterial = db.prepare('SELECT id, title FROM materials WHERE id = ?').get(item.original_id) as any;
         
+        // 同じIDが存在する場合、新しいIDを生成して復元
+        let newMaterialId = item.original_id;
+        let needNewId = false;
+        
         if (existingMaterial) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: `復元先に同名の資料「${existingMaterial.title}」が既に存在します。復元を中断しました。\n\n必要であれば、復元元をダウンロードして再度作成してください。`,
-            },
-            { status: 409 } // Conflict
-          );
+          // 新しいIDを生成
+          newMaterialId = Date.now().toString();
+          needNewId = true;
+          debug(MODULE_NAME, `同じIDが存在するため、新しいIDで復元: original_id=${item.original_id} -> new_id=${newMaterialId}`);
         }
 
-        // ファイルシステム上にも存在するかチェック
+        // ファイルシステム上にも存在するかチェック（新しいIDでチェック）
         const folderPath = item.original_folder_path || '';
         let materialDir: string;
-        if (folderPath && folderPath.trim() !== '') {
-          const normalizedFolderPath = folderPath.replace(/\//g, path.sep);
-          materialDir = path.join('shared', 'shared_materials', 'folders', normalizedFolderPath, `material_${item.original_id}`);
-        } else {
-          materialDir = path.join('shared', 'shared_materials', 'uncategorized', `material_${item.original_id}`);
+        let fullMaterialDir: string;
+        
+        // 新しいIDでも存在する場合は、再度IDを生成（無限ループを防ぐため最大10回）
+        let retryCount = 0;
+        while (retryCount < 10) {
+          // パスを計算
+          if (folderPath && folderPath.trim() !== '') {
+            const normalizedFolderPath = folderPath.replace(/\//g, path.sep);
+            materialDir = path.join('shared', 'shared_materials', 'folders', normalizedFolderPath, `material_${newMaterialId}`);
+          } else {
+            materialDir = path.join('shared', 'shared_materials', 'uncategorized', `material_${newMaterialId}`);
+          }
+          fullMaterialDir = path.join(drivePath, materialDir);
+          
+          try {
+            const stats = await fs.stat(fullMaterialDir);
+            if (stats.isDirectory()) {
+              // 存在する場合は新しいIDを生成
+              newMaterialId = Date.now().toString();
+              needNewId = true;
+              retryCount++;
+              continue;
+            }
+            break;
+          } catch (statErr: any) {
+            // ディレクトリが存在しない場合は問題なし（復元可能）
+            if (statErr.code !== 'ENOENT') {
+              error(MODULE_NAME, '資料存在確認エラー:', statErr);
+            }
+            break;
+          }
         }
         
-        const fullMaterialDir = path.join(drivePath, materialDir);
-        
-        try {
-          const stats = await fs.stat(fullMaterialDir);
-          if (stats.isDirectory()) {
-            return NextResponse.json(
-              {
-                success: false,
-                error: `復元先に同名の資料が既に存在します（ファイルシステム）。復元を中断しました。\n\n必要であれば、復元元をダウンロードして再度作成してください。`,
-              },
-              { status: 409 } // Conflict
-            );
-          }
-        } catch (statErr: any) {
-          // ディレクトリが存在しない場合は問題なし（復元可能）
-          if (statErr.code !== 'ENOENT') {
-            error(MODULE_NAME, '資料存在確認エラー:', statErr);
+        // 新しいIDが必要な場合、itemを更新
+        if (needNewId) {
+          item.original_id = newMaterialId;
+          // 復元先パスも更新
+          if (folderPath && folderPath.trim() !== '') {
+            const normalizedFolderPath = folderPath.replace(/\//g, path.sep);
+            item.original_path = path.join(drivePath, 'shared', 'shared_materials', 'folders', normalizedFolderPath, `material_${newMaterialId}`);
+          } else {
+            item.original_path = path.join(drivePath, 'shared', 'shared_materials', 'uncategorized', `material_${newMaterialId}`);
           }
         }
       }
@@ -154,8 +173,16 @@ export async function PUT(
             // 復元後のパスからメタデータを読み込む
             const metadataPath = path.join(item.original_path, 'metadata.json');
             if (await fs.access(metadataPath).then(() => true).catch(() => false)) {
-              const { readJSON } = await import('@/shared/lib/file-system/json');
+              const { readJSON, writeJSON } = await import('@/shared/lib/file-system/json');
               const metadata = await readJSON(metadataPath);
+              
+              // 新しいIDが生成された場合、metadata.jsonのidを更新
+              const finalMaterialId = item.original_id;
+              if (metadata.id !== finalMaterialId) {
+                metadata.id = finalMaterialId;
+                await writeJSON(metadataPath, metadata);
+                debug(MODULE_NAME, `metadata.jsonのidを更新: ${metadata.id} -> ${finalMaterialId}`);
+              }
               
               const insert = db.prepare(`
                 INSERT INTO materials (
@@ -167,7 +194,7 @@ export async function PUT(
               `);
               
               insert.run(
-                metadata.id,
+                finalMaterialId,
                 metadata.uuid,
                 metadata.title,
                 metadata.description || null,
@@ -185,13 +212,23 @@ export async function PUT(
                 metadata.likes || 0
               );
               
-              debug(MODULE_NAME, `SQLiteに資料を復元: id=${metadata.id}`);
+              debug(MODULE_NAME, `SQLiteに資料を復元: id=${finalMaterialId}`);
             } else {
               error(MODULE_NAME, `メタデータファイルが見つかりません: ${metadataPath}`);
             }
-          } catch (err) {
+          } catch (err: any) {
             error(MODULE_NAME, 'SQLiteへの資料復元に失敗:', err);
-            // 復元に失敗しても、ファイルは復元されているので、エラーを返さない
+            // PRIMARY KEY制約違反の場合はエラーを返す
+            if (err.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' || err.message?.includes('UNIQUE constraint failed')) {
+              return NextResponse.json(
+                {
+                  success: false,
+                  error: '復元に失敗しました（IDの競合）。別のIDで再度お試しください。',
+                },
+                { status: 500 }
+              );
+            }
+            // その他のエラーはログに記録して続行（ファイルは復元されているので）
           }
         } else if (item.type === 'folder') {
           // foldersテーブルに復元（再帰的に子フォルダとフォルダ内の資料も復元）

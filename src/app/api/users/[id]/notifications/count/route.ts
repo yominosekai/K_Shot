@@ -4,28 +4,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUnreadNotificationCount } from '@/shared/lib/data-access/notifications';
 import { error } from '@/shared/lib/logger';
 
-const MODULE_NAME = 'api/users/[sid]/notifications/count';
+const MODULE_NAME = 'api/users/[id]/notifications/count';
 
 /**
- * GET /api/users/[sid]/notifications/count
+ * GET /api/users/[id]/notifications/count
  * ユーザーの未読通知数のみを取得（軽量API）
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ sid: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { sid } = await params;
+    const { id } = await params;
 
     // URLデコード
-    let decodedSid: string;
+    let decodedId: string;
     try {
-      decodedSid = decodeURIComponent(sid);
+      decodedId = decodeURIComponent(id);
     } catch {
-      decodedSid = sid;
+      decodedId = id;
     }
 
-    const unreadCount = getUnreadNotificationCount(decodedSid);
+    const unreadCount = getUnreadNotificationCount(decodedId);
 
     return NextResponse.json({
       success: true,

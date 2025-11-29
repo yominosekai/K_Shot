@@ -8,30 +8,30 @@ const MODULE_NAME = 'busy-monitor';
 
 /**
  * SQLITE_BUSY監視ログファイルのパスを取得
- * @param userSid ユーザーSID
+ * @param userId ユーザーID
  * @returns ログファイルのパス
  */
-function getBusyLogPath(userSid: string): string {
-  return getUserSubPath(userSid, 'logs', 'sqlite_busy.log');
+function getBusyLogPath(userId: string): string {
+  return getUserSubPath(userId, 'logs', 'sqlite_busy.log');
 }
 
 /**
  * SQLITE_BUSYエラーをログに記録
- * @param userSid ユーザーSID
+ * @param userId ユーザーID
  * @param operation 操作名（例：setSystemConfig, uploadMaterial, updateMaterial）
  * @param retryCount リトライ回数
  * @param success 最終的に成功したか
  * @param additionalInfo 追加情報（materialId, keyなど）
  */
 export async function logBusyError(
-  userSid: string,
+  userId: string,
   operation: string,
   retryCount: number,
   success: boolean,
   additionalInfo?: Record<string, any>
 ): Promise<void> {
   try {
-    const logPath = getBusyLogPath(userSid);
+    const logPath = getBusyLogPath(userId);
     const logDir = path.dirname(logPath);
     
     // ディレクトリが存在しない場合は作成
@@ -43,7 +43,7 @@ export async function logBusyError(
     
     const logEntry = {
       timestamp,
-      userSid,
+      userId,
       operation,
       retryCount,
       success,
@@ -63,20 +63,20 @@ export async function logBusyError(
 
 /**
  * エラーログファイルのパスを取得
- * @param userSid ユーザーSID
+ * @param userId ユーザーID
  * @returns ログファイルのパス
  */
-function getErrorLogPath(userSid: string): string {
-  return getUserSubPath(userSid, 'logs', 'errors.json');
+function getErrorLogPath(userId: string): string {
+  return getUserSubPath(userId, 'logs', 'errors.json');
 }
 
 /**
  * エラーログを読み取る（管理者用）
- * @param userSid ユーザーSID（指定しない場合は全ユーザー）
+ * @param userId ユーザーID（指定しない場合は全ユーザー）
  * @param limit 取得件数（最新のN件、0の場合は全件）
  * @returns ログエントリの配列
  */
-export function readErrorLog(userSid?: string, limit: number = 0): Array<Record<string, any>> {
+export function readErrorLog(userId?: string, limit: number = 0): Array<Record<string, any>> {
   try {
     const usersDir = getUsersRootPath();
     
@@ -85,10 +85,10 @@ export function readErrorLog(userSid?: string, limit: number = 0): Array<Record<
     }
     
     const entries: Array<Record<string, any>> = [];
-    
-    if (userSid) {
+
+    if (userId) {
       // 特定ユーザーのログを読み取る
-      const logPath = getErrorLogPath(userSid);
+      const logPath = getErrorLogPath(userId);
       if (fs.existsSync(logPath)) {
         const content = fs.readFileSync(logPath, 'utf-8');
         const lines = content.trim().split('\n').filter(line => line.trim());
@@ -144,11 +144,11 @@ export function readErrorLog(userSid?: string, limit: number = 0): Array<Record<
 
 /**
  * SQLITE_BUSY監視ログを読み取る（管理者用）
- * @param userSid ユーザーSID（指定しない場合は全ユーザー）
+ * @param userId ユーザーID（指定しない場合は全ユーザー）
  * @param limit 取得件数（最新のN件、0の場合は全件）
  * @returns ログエントリの配列
  */
-export function readBusyLog(userSid?: string, limit: number = 0): Array<Record<string, any>> {
+export function readBusyLog(userId?: string, limit: number = 0): Array<Record<string, any>> {
   try {
     const usersDir = getUsersRootPath();
     
@@ -157,10 +157,10 @@ export function readBusyLog(userSid?: string, limit: number = 0): Array<Record<s
     }
     
     const entries: Array<Record<string, any>> = [];
-    
-    if (userSid) {
+
+    if (userId) {
       // 特定ユーザーのログを読み取る
-      const logPath = getBusyLogPath(userSid);
+      const logPath = getBusyLogPath(userId);
       if (fs.existsSync(logPath)) {
         const content = fs.readFileSync(logPath, 'utf-8');
         const lines = content.trim().split('\n').filter(line => line.trim());

@@ -24,9 +24,9 @@ export async function POST() {
     }
     
     // 新しいユーザーとトークンを発行する
-    const userSid = randomUUID();
-    const username = `user_${userSid.slice(0, 8)}`;
-    const displayName = `User ${userSid.slice(0, 6)}`;
+    const userId = randomUUID();
+    const username = `user_${userId.slice(0, 8)}`;
+    const displayName = `User ${userId.slice(0, 6)}`;
     const email = `${username}@local`;
     const now = new Date().toISOString();
     const deviceLabel = `device-${randomUUID().slice(0, 6)}`;
@@ -34,7 +34,7 @@ export async function POST() {
     db.prepare(
       `
         INSERT INTO users (
-          sid,
+          id,
           username,
           display_name,
           email,
@@ -45,13 +45,13 @@ export async function POST() {
         )
         VALUES (?, ?, ?, ?, 'user', 1, ?, ?)
       `
-    ).run(userSid, username, displayName, email, now, now);
+    ).run(userId, username, displayName, email, now, now);
 
     const tokenValue = randomUUID();
     const issuedAt = now;
     const signature = signToken({
       token: tokenValue,
-      userSid,
+      userId,
       issuedAt,
       deviceLabel,
     });
@@ -60,7 +60,7 @@ export async function POST() {
       `
         INSERT INTO device_tokens (
           token,
-          user_sid,
+          user_id,
           signature,
           device_label,
           issued_at,
@@ -69,13 +69,13 @@ export async function POST() {
           signature_version
         ) VALUES (?, ?, ?, ?, ?, ?, 'active', 1)
       `
-    ).run(tokenValue, userSid, signature, deviceLabel, issuedAt, issuedAt);
+    ).run(tokenValue, userId, signature, deviceLabel, issuedAt, issuedAt);
 
     await writeDeviceToken({
       schema_version: '1.0.0',
       token: tokenValue,
       signature,
-      user_sid: userSid,
+      user_id: userId,
       issued_at: issuedAt,
       device_label: deviceLabel,
       signature_version: 1,
@@ -83,7 +83,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      user_sid: userSid,
+      user_id: userId,
       message: '初期ユーザーとデバイストークンを発行しました',
     });
   } catch (error) {
