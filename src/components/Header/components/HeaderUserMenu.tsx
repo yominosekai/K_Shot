@@ -128,7 +128,7 @@ export default function HeaderUserMenu({ user, onRoleChangeClick }: HeaderUserMe
             className="flex items-center space-x-3 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             <Lightbulb className="w-4 h-4" />
-            <span>開発の考え</span>
+            <span>開発者の考え</span>
           </Link>
           <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
           <Link

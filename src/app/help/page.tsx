@@ -14,17 +14,17 @@ import { manualDocs, filterDocsByPermission, isAdminOnlyDoc } from '@/content/he
 import { requireAuth, isAdmin } from '@/shared/lib/auth/middleware';
 
 const getManualContent = (filePath: string) => {
-  // ビルド時はpublic/content/help、開発時はsrc/content/helpを優先的に試す
+  // 開発時はsrc/content/help、ビルド時はpublic/content/helpを優先的に試す
   // src/content/helpのパスをpublic/content/helpに変換
   const publicPath = filePath.replace('src/content/help', 'public/content/help');
   
   let content: string;
   try {
-    // まずpublic/content/helpを試す（ビルド後の本番環境）
-    content = fs.readFileSync(path.join(process.cwd(), publicPath), 'utf-8');
-  } catch {
-    // なければsrc/content/helpを試す（開発環境）
+    // まずsrc/content/helpを試す（開発環境・編集したファイルを優先）
     content = fs.readFileSync(path.join(process.cwd(), filePath), 'utf-8');
+  } catch {
+    // なければpublic/content/helpを試す（ビルド後の本番環境）
+    content = fs.readFileSync(path.join(process.cwd(), publicPath), 'utf-8');
   }
   // 先頭のh1タイトル行、説明文、区切り線（---）を削除
   // パターン: # タイトル\n\n説明文\n\n---\n\n までを削除
@@ -435,15 +435,15 @@ export default async function ManualPage({ searchParams }: ManualPageProps) {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-slate-900 dark:text-slate-100">
       <header className="sticky top-0 z-40 border-b border-gray-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-sm">
-        <div className="max-w-[95%] xl:max-w-[90%] 2xl:max-w-7xl mx-auto px-4 pt-6 pb-1 space-y-3">
+        <div className="w-full px-4 sm:px-6 lg:px-8 pt-4 pb-0 space-y-2">
           <p className="text-xs uppercase tracking-[0.35em] text-indigo-500 dark:text-indigo-300">DOCUMENTATION</p>
           <h1 className="text-3xl font-bold">{activeDoc.title}</h1>
           <p className="text-gray-600 dark:text-slate-300 leading-relaxed">{activeDoc.description}</p>
           <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:gap-6">
-            <div className="flex-1">
+            <div className="flex-1 min-w-0 mt-1">
               <ManualDocSelector activeDocId={activeDoc.id} availableDocs={availableDocs} />
             </div>
-            <div className="lg:ml-auto lg:mt-0">
+            <div className="lg:ml-auto lg:-mt-0.5 flex-shrink-0">
               <ManualSearchBar
                 docs={docsWithContent.map(({ id, title, content }) => ({ id, title, content }))}
                 activeDocId={activeDoc.id}
@@ -457,7 +457,7 @@ export default async function ManualPage({ searchParams }: ManualPageProps) {
         </div>
       </header>
 
-      <main className="relative max-w-[95%] xl:max-w-[90%] 2xl:max-w-7xl mx-auto px-4 py-10 space-y-6">
+      <main className="relative w-full px-4 sm:px-6 lg:px-8 py-10 space-y-6">
         <article className="rounded-3xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-xl p-6 sm:p-10 [&>h2:first-child]:mt-0">
           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={createMarkdownComponents(highlightQuery, activeDoc.id, globalHitIndexMap)}>
             {activeDoc.content}

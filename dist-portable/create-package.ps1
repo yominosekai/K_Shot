@@ -189,8 +189,10 @@ $startBat | Out-File -FilePath $startBatPath -Encoding UTF8 -NoNewline
 
 Write-Host "✅ 起動スクリプトを作成しました" -ForegroundColor Green
 
-# READMEを作成
-$readme = @"
+# READMEを作成（既存の場合は上書きしない）
+$readmePath = Join-Path $distFolder "README.txt"
+if (-not (Test-Path $readmePath)) {
+    $readme = @"
 ========================================
 ナレッジ管理ツール（K_Shot） - ポータブル版
 ========================================
@@ -259,11 +261,11 @@ $readme = @"
 
 詳細なドキュメントは、プロジェクトの README.md を参照してください。
 "@
-
-$readmePath = Join-Path $distFolder "README.txt"
-$readme | Out-File -FilePath $readmePath -Encoding UTF8
-
-Write-Host "✅ READMEを作成しました" -ForegroundColor Green
+    $readme | Out-File -FilePath $readmePath -Encoding UTF8
+    Write-Host "✅ READMEを作成しました" -ForegroundColor Green
+} else {
+    Write-Host "ℹ️  README.txtは既に存在するため、上書きしませんでした" -ForegroundColor Gray
+}
 
 # ポータブルNode.jsの自動セットアップ
 $nodeFolder = Join-Path $distFolder "node"

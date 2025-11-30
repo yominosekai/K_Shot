@@ -8,10 +8,12 @@ export type ManualDocDefinition = {
 
 // 管理者専用ドキュメントIDのリスト
 export const ADMIN_ONLY_DOC_IDS = [
+  'admin-manual',
   'project-overview',
   'design-architecture',
   'troubleshooting',
   'concerns-improvements',
+  'development-philosophy',
 ] as const;
 
 export const manualDocs: ManualDocDefinition[] = [
@@ -21,6 +23,13 @@ export const manualDocs: ManualDocDefinition[] = [
     description: '日常のオペレーションや画面操作を詳しく解説します。',
     file: 'src/content/help/user-manual.md',
     adminOnly: false,
+  },
+  {
+    id: 'admin-manual',
+    title: '管理者マニュアル',
+    description: '管理者専用機能の操作手順をまとめています。',
+    file: 'src/content/help/admin-manual.md',
+    adminOnly: true,
   },
   {
     id: 'project-overview',
@@ -48,6 +57,13 @@ export const manualDocs: ManualDocDefinition[] = [
     title: '懸念事項・改善点',
     description: 'リファクタリング進捗やパフォーマンス・セキュリティに関するメモです。',
     file: 'src/content/help/concerns-improvements.md',
+    adminOnly: true,
+  },
+  {
+    id: 'development-philosophy',
+    title: '開発者の考え方と残しておきたいこと',
+    description: '開発における設計思想、開発方針、将来の開発者に伝えたいことをまとめています。',
+    file: 'src/content/help/development-philosophy.md',
     adminOnly: true,
   },
 ];

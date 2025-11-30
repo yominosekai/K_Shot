@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Info, Package, Code, Calendar, Plus, Edit, Wrench } from 'lucide-react';
+import { Info, Package, Code, Calendar, Plus, Edit, Wrench, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ChangelogEntry {
   version: string;
@@ -26,6 +26,7 @@ interface VersionInfo {
 export default function VersionPage() {
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedVersions, setExpandedVersions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // package.jsonからバージョン情報を取得
@@ -34,6 +35,10 @@ export default function VersionPage() {
       .then((data) => {
         if (data.success) {
           setVersionInfo(data.info);
+          // 最新バージョン（最初のエントリ）を展開状態にする
+          if (data.info.changelog && data.info.changelog.length > 0) {
+            setExpandedVersions(new Set([data.info.changelog[0].version]));
+          }
         }
       })
       .catch((err) => {
@@ -43,6 +48,18 @@ export default function VersionPage() {
         setLoading(false);
       });
   }, []);
+
+  const toggleVersion = (version: string) => {
+    setExpandedVersions((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(version)) {
+        newSet.delete(version);
+      } else {
+        newSet.add(version);
+      }
+      return newSet;
+    });
+  };
 
   if (loading) {
     return (
@@ -90,7 +107,7 @@ export default function VersionPage() {
                   <div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">バージョン</div>
                     <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {versionInfo?.version || '0.9.0'}
+                      {versionInfo?.version || '1.0.0'}
                     </div>
                   </div>
                 </div>
@@ -145,76 +162,109 @@ export default function VersionPage() {
               <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
                 変更履歴
               </h3>
-              <div className="space-y-6">
-                {versionInfo.changelog.map((entry, index) => (
-                  <div
-                    key={index}
-                    className="pb-6 last:pb-0 border-b border-gray-200 dark:border-gray-700 last:border-b-0"
-                  >
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">
-                        v{entry.version}
-                      </span>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {entry.date}
-                      </span>
+              <div className="space-y-4">
+                {versionInfo.changelog.map((entry, index) => {
+                  const isLatest = index === 0;
+                  const isExpanded = expandedVersions.has(entry.version);
+                  
+                  return (
+                    <div
+                      key={index}
+                      className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+                    >
+                      <button
+                        onClick={() => !isLatest && toggleVersion(entry.version)}
+                        className={`w-full flex items-center justify-between p-4 ${
+                          isLatest
+                            ? 'bg-blue-50 dark:bg-blue-900/20 cursor-default'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors'
+                        }`}
+                        disabled={isLatest}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-bold text-gray-900 dark:text-white">
+                            v{entry.version}
+                          </span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {entry.date}
+                          </span>
+                          {isLatest && (
+                            <span className="px-2 py-0.5 text-xs font-semibold bg-blue-600 text-white rounded">
+                              最新
+                            </span>
+                          )}
+                        </div>
+                        {!isLatest && (
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? (
+                              <ChevronUp className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                            ) : (
+                              <ChevronDown className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                            )}
+                          </div>
+                        )}
+                      </button>
+                      
+                      {(isLatest || isExpanded) && (
+                        <div className="p-4 pt-0 space-y-3">
+                          {entry.added && entry.added.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <Plus className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                                  追加
+                                </span>
+                              </div>
+                              <ul className="list-disc list-inside space-y-1 ml-6">
+                                {entry.added.map((item, i) => (
+                                  <li key={i} className="text-sm text-gray-700 dark:text-gray-300">
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {entry.changed && entry.changed.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <Edit className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+                                  変更
+                                </span>
+                              </div>
+                              <ul className="list-disc list-inside space-y-1 ml-6">
+                                {entry.changed.map((item, i) => (
+                                  <li key={i} className="text-sm text-gray-700 dark:text-gray-300">
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {entry.fixed && entry.fixed.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <Wrench className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                                <span className="text-sm font-semibold text-orange-700 dark:text-orange-400">
+                                  修正
+                                </span>
+                              </div>
+                              <ul className="list-disc list-inside space-y-1 ml-6">
+                                {entry.fixed.map((item, i) => (
+                                  <li key={i} className="text-sm text-gray-700 dark:text-gray-300">
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    
-                    {entry.added && entry.added.length > 0 && (
-                      <div className="mt-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Plus className="w-4 h-4 text-green-600 dark:text-green-400" />
-                          <span className="text-sm font-semibold text-green-700 dark:text-green-400">
-                            追加
-                          </span>
-                        </div>
-                        <ul className="list-disc list-inside space-y-1 ml-6">
-                          {entry.added.map((item, i) => (
-                            <li key={i} className="text-sm text-gray-700 dark:text-gray-300">
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {entry.changed && entry.changed.length > 0 && (
-                      <div className="mt-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Edit className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
-                            変更
-                          </span>
-                        </div>
-                        <ul className="list-disc list-inside space-y-1 ml-6">
-                          {entry.changed.map((item, i) => (
-                            <li key={i} className="text-sm text-gray-700 dark:text-gray-300">
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {entry.fixed && entry.fixed.length > 0 && (
-                      <div className="mt-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Wrench className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                          <span className="text-sm font-semibold text-orange-700 dark:text-orange-400">
-                            修正
-                          </span>
-                        </div>
-                        <ul className="list-disc list-inside space-y-1 ml-6">
-                          {entry.fixed.map((item, i) => (
-                            <li key={i} className="text-sm text-gray-700 dark:text-gray-300">
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

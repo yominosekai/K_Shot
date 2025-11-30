@@ -10,19 +10,19 @@
 
 | ファイル | 行数 | 目安 | 超過率 | 優先度 | 状態 |
 | --- | --- | --- | --- | --- | --- |
-| `Header.tsx` | 169 | 200 | - | - | ✅ 完了（570 → 169 行） |
-| `admin/page.tsx` | 127 | 200 | - | - | ✅ 完了（508 → 127 行） |
-| `api/materials/[id]/route.ts` | 30 | 300 | - | - | ✅ 完了（485 → 30 行） |
-| `MaterialsSearchTab.tsx` | 196 | 200 | - | - | ✅ 完了（480 → 196 行） |
-| `MaterialLibraryBrowser.tsx` | 306 | 300 | 102% | 低 | ✅ 許容範囲（766 → 306 行） |
-| `overview/page.tsx` | 161 | 200 | - | - | ✅ 完了（835 → 161 行） |
-| `materials/page.tsx` | 372 | 200 | 186% | 中 | ⚠️ 要リファクタリング |
+| `Header.tsx` | 194 | 200 | - | - | ✅ 完了（570 → 194 行） |
+| `admin/page.tsx` | 132 | 200 | - | - | ✅ 完了（508 → 132 行） |
+| `api/materials/[id]/route.ts` | 26 | 300 | - | - | ✅ 完了（485 → 26 行） |
+| `MaterialsSearchTab.tsx` | 254 | 200 | 127% | 低 | ✅ 完了（480 → 254 行） |
+| `MaterialLibraryBrowser.tsx` | 246 | 300 | - | - | ✅ 完了（766 → 246 行） |
+| `overview/page.tsx` | 139 | 200 | - | - | ✅ 完了（835 → 139 行） |
+| `materials/page.tsx` | 274 | 200 | 137% | 低 | ✅ 完了（リファクタリング済み） |
 
 ### 1.2 コメント
 
 - 完了済みファイルはコンポーネント分割やカスタムフック化で設計指針（1ファイル 200～300 行）に収まりました。
-- `MaterialLibraryBrowser.tsx` は 300 行をわずかに超えるものの許容範囲内。さらなる分割は低優先度。
-- `materials/page.tsx` はタブ/モーダル/URL 管理が混在。`useMaterialsPageTabs`, `useMaterialsPageModals`, `useMaterialsPageURL` などへ分離する案を検討中。
+- `materials/page.tsx` は既にリファクタリング完了。`useMaterialsPageTabs`, `useMaterialsPageModals`, `useMaterialsBrowser`, `useMaterialsViewMode` などのカスタムフックに分割済み。
+- `MaterialsSearchTab.tsx` と `materials/page.tsx` は若干超過しているが許容範囲内。さらなる分割は低優先度。
 
 ---
 
@@ -40,19 +40,20 @@
 ### 2.2 改善予定
 
 1. **ページネーション（優先度: 中）**  
-   - 資料/ユーザー一覧の初期ロードを 30 秒 → 2 秒へ短縮する狙い。API 側の `limit/offset` は実装済み。
+   - 資料/ユーザー一覧の初期ロードを 30 秒 → 2 秒へ短縮する狙い。API 側の `limit/offset` は実装済み。フィードバックページ（`/feedback`）とDB管理ページ（`/admin/database`）ではフロントエンド側のページネーションが実装済み。資料一覧（`/materials`）とユーザー一覧（`/members`）では未実装。
 2. **バッチ取得 API（優先度: 中）**  
-   - 作成者情報などを `POST /api/users/batch` で一括取得してリクエスト数を削減。
+   - 作成者情報などを一括取得してリクエスト数を削減。現在は `UsersContext.getUsers()` で並列取得しているが、専用の `POST /api/users/batch` エンドポイントの実装を検討中。
 3. **React Query / SWR（優先度: 低）**  
-   - キャッシュとフェッチの戦略を統一し、データ一貫性を向上。
+   - キャッシュとフェッチの戦略を統一し、データ一貫性を向上。現在はカスタムフックとContextで管理しているが、将来的な導入を検討。
 
 ---
 
 ## 3. セキュリティ懸念
 
-- **認証情報の保存**: 現状は Windows 認証のみ。将来的に保存が必要になった場合は暗号化ストレージを必須にする。
-- **DB ファイルの権限**: ネットワークドライブ上の `shared/learning_management.db` には最小権限を設定。
-- **API 権限チェック**: フロント側だけでなく全エンドポイントで権限検証（既に実装済みだが継続的なレビューが必要）。
+- **認証情報の保存**: 現状はデバイストークン認証（証明ファイルベース）。デバイストークンファイルは各端末に保存され、将来的に保存が必要になった場合は暗号化ストレージを必須にする。
+- **DB ファイルの権限**: ネットワークドライブ上の `{ドライブ}:\k_shot\shared\k_shot.db` には最小権限を設定。
+- **API 権限チェック**: フロント側だけでなく全エンドポイントで権限検証（既に実装済みだが継続的なレビューが必要）。  
+  - ⚠️ **注意**: 資料の編集（`PUT /api/materials/[id]`）と削除（`POST /api/trash`）には作成者/管理者権限チェックが実装されていない。コメントの編集・削除には実装済み（作成者のみ）。将来的に権限チェックを追加する必要がある。
 
 ---
 
@@ -71,7 +72,7 @@
 
 - ✅ `departments.csv`, `user_activities`, `notifications`, `material_types`, `difficulty_levels`, `material_comments`, `material_revisions`, `feedback_metadata` → SQLite へ移行済み。
 - ❗`skills.csv`, `tasks.csv` などは未移行。  
-- 📂 JSON/CSV 管理のまま: `users/{SID}/bookmarks.json`, `data/trash/trash.csv`, `users/{SID}/feedback/feedback.json`。
+- 📂 JSON/CSV 管理のまま: `users/{user_id_hash}/bookmarks.json`, `data/trash/trash.csv`, `users/{user_id_hash}/feedback/feedback.json`（user_id_hashはuserIdをSHA256でハッシュ化した32文字の文字列）。
 
 ### 5.2 機能追加・設定拡張
 
@@ -92,7 +93,8 @@
 
 ## 7. まとめと推奨アクション
 
-- 2025-11-12 時点で大規模リファクタリングは完了。`materials/page.tsx` の分割とページネーション/バッチ API が次の中優先度タスク。
+- 大規模リファクタリングは完了。主要ファイルはカスタムフック化により設計指針に収まりました。
+- 次の中優先度タスク: フロントエンド側でのページネーション実装、バッチ取得 API の追加実装。
 - 長期的には React Query や仮想スクロール導入、JSON/CSV データの DB 化を検討。
 - UX 由来の軽微な問題（斜め線、閲覧数反映）も backlog に入れておき、時間を見て改善する。
 

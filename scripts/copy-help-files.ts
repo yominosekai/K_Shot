@@ -24,6 +24,11 @@ try {
   let copiedCount = 0;
 
   for (const file of files) {
+    // README.mdはコピーしない（public/content/help/README.mdは手動で作成した自動生成警告用）
+    if (file === 'README.md') {
+      continue;
+    }
+
     const sourcePath = path.join(sourceDir, file);
     const destPath = path.join(destDir, file);
 

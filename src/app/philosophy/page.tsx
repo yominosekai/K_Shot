@@ -1,85 +1,80 @@
+import fs from 'fs';
+import path from 'path';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 
-const principles = [
-  {
-    title: '知見を長期的に残す',
-    body: '仕様や意思決定の背景をドキュメント化し、将来のメンバーが迷わないようにする。 UI の文言やデータ構造にも意図を紐づけておく。',
-  },
-  {
-    title: '利用者視点での一貫性',
-    body: '権限によって見える情報が変わる場合でも、ナビゲーションや動線は共通化して迷子を減らす。 見た目だけでなく、レスポンスやマイクロコピーのトーンも揃える。',
-  },
-  {
-    title: 'オフライン運用を意識した設計',
-    body: 'ネットワークの状況に依存しないようキャッシュやバックアップの導線を強化し、現場で即座に復旧できる仕組みを重視する。',
-  },
-  {
-    title: '開発者体験の改善',
-    body: '機能追加よりも先にリファクタリングやログを整備し、未来の自分や他の開発者が変更しやすい土台を作る。',
-  },
-];
-
-const commitments = [
-  '重要な判断や学びはメモ・ドキュメント・ページとして残す',
-  'UI に表示されるテキストは、できるだけ実務の言葉で書く',
-  'リリース前に管理者/一般ユーザー双方の動線を必ず触って確認する',
-  '「仮対応」や「一時的な設定」をコメントやマニュアルで明示する',
-];
+const getPhilosophyContent = () => {
+  // 開発時はsrc/content/help、ビルド時はpublic/content/helpを優先的に試す
+  const filePath = 'src/content/help/development-philosophy.md';
+  const publicPath = 'public/content/help/development-philosophy.md';
+  
+  let content: string;
+  try {
+    // まずsrc/content/helpを試す（開発環境・編集したファイルを優先）
+    content = fs.readFileSync(path.join(process.cwd(), filePath), 'utf-8');
+  } catch {
+    // なければpublic/content/helpを試す（ビルド後の本番環境）
+    content = fs.readFileSync(path.join(process.cwd(), publicPath), 'utf-8');
+  }
+  
+  return content;
+};
 
 export default function PhilosophyPage() {
+  const content = getPhilosophyContent();
+  
+  // Markdownコンポーネントのカスタマイズ
+  const markdownComponents = {
+    h1: ({ children }: { children?: React.ReactNode }) => (
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-6">{children}</h1>
+    ),
+    h2: ({ children }: { children?: React.ReactNode }) => (
+      <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-10 mb-6 pb-2 border-b-2 border-indigo-200 dark:border-indigo-800">{children}</h2>
+    ),
+    h3: ({ children }: { children?: React.ReactNode }) => (
+      <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mt-8 mb-4">{children}</h3>
+    ),
+    p: ({ children }: { children?: React.ReactNode }) => (
+      <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-5">{children}</p>
+    ),
+    ul: ({ children }: { children?: React.ReactNode }) => (
+      <ul className="list-disc pl-6 space-y-2 text-gray-700 dark:text-gray-300 mb-5">{children}</ul>
+    ),
+    ol: ({ children }: { children?: React.ReactNode }) => (
+      <ol className="list-decimal pl-6 space-y-2 text-gray-700 dark:text-gray-300 mb-5">{children}</ol>
+    ),
+    li: ({ children }: { children?: React.ReactNode }) => (
+      <li className="leading-relaxed">{children}</li>
+    ),
+    blockquote: ({ children }: { children?: React.ReactNode }) => (
+      <blockquote className="border-l-4 border-indigo-400 bg-indigo-50/60 dark:bg-indigo-900/30 px-6 py-4 rounded-r-xl text-gray-700 dark:text-gray-200 italic mb-6">{children}</blockquote>
+    ),
+    hr: () => <hr className="my-12 border-dashed border-gray-200 dark:border-gray-700" />,
+  };
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10 space-y-10">
-      <div className="flex items-center gap-3 text-sm text-blue-600">
-        <ArrowLeft className="w-4 h-4" />
-        <Link href="/" className="hover:underline">
-          ホームへ戻る
-        </Link>
+    <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-slate-900 dark:text-slate-100">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+        <div className="flex items-center gap-3 text-sm text-blue-600 dark:text-blue-400 mb-4">
+          <ArrowLeft className="w-4 h-4" />
+          <Link href="/" className="hover:underline">
+            ホームへ戻る
+          </Link>
+        </div>
+
+        <article className="rounded-3xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-xl p-6 sm:p-10">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+            components={markdownComponents}
+          >
+            {content}
+          </ReactMarkdown>
+        </article>
       </div>
-
-      <header className="space-y-4">
-        <p className="text-sm font-semibold text-blue-500">CREATOR NOTES</p>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">開発の考え方と残しておきたいこと</h1>
-        <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-          このページは、今後チームメンバーが増えたり引き継ぎが発生したときに
-          「なぜこう作ったのか」「何を大切にしているのか」を共有するためのメモです。
-          実装よりも背景にあるスタンスを中心にまとめています。
-        </p>
-      </header>
-
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">開発理念</h2>
-        <div className="grid gap-6">
-          {principles.map((principle) => (
-            <article
-              key={principle.title}
-              className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm"
-            >
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{principle.title}</h3>
-              <p className="mt-2 text-gray-600 dark:text-gray-300 leading-relaxed">{principle.body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">開発時のコミットメント</h2>
-        <div className="rounded-2xl border border-blue-100 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-900/30 p-6 space-y-3">
-          {commitments.map((item) => (
-            <p key={item} className="text-gray-700 dark:text-gray-200">
-              • {item}
-            </p>
-          ))}
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">これからのメモ</h2>
-        <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-          新しい学び・改善したい点・議論の途中経過など、ドキュメント化するほどでもない情報もここに追記していきます。
-          将来的には更新履歴を残して、方針の変遷も見えるようにしたいと考えています。
-        </p>
-      </section>
     </div>
   );
 }

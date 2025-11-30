@@ -34,7 +34,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       info: {
-        version: packageJson.version || '0.9.0',
+        version: packageJson.version || '1.0.0',
         name: packageJson.name || 'ナレッジ管理ツール（K_Shot）',
         description: packageJson.description || '',
         coreStack,

@@ -226,7 +226,7 @@ export default function ManualSearchBar({
   };
 
   return (
-    <div className="flex w-full max-w-[220px] flex-col gap-1 lg:max-w-[260px]" style={{ minHeight: '64px' }}>
+    <div className="flex w-full max-w-[220px] flex-col gap-1 lg:max-w-[260px]" style={{ minHeight: '56px' }}>
       <form
         onSubmit={onSubmit}
         className="flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-gray-900 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"

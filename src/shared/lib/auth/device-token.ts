@@ -9,6 +9,7 @@ import { debug, error } from '../logger';
 const MODULE_NAME = 'device-token';
 const TOKEN_FILE_NAME = 'device-token.json';
 let hasWarnedSecret = false;
+let cachedSecret: string | null = null;
 
 export interface DeviceTokenFile {
   schema_version: string;
@@ -42,15 +43,22 @@ export function getDeviceTokenFilePath(): string {
 }
 
 function getTokenSecret(): string {
+  // キャッシュがあれば再利用（環境変数のチェックを1回だけにする）
+  if (cachedSecret !== null) {
+    return cachedSecret;
+  }
+
   const secret = process.env.TOKEN_SECRET_KEY;
   if (!secret) {
     if (!hasWarnedSecret) {
       debug(MODULE_NAME, 'TOKEN_SECRET_KEYが設定されていません。開発用の固定シークレットを使用します。');
       hasWarnedSecret = true;
     }
-    return 'development-token-secret';
+    cachedSecret = 'development-token-secret';
+    return cachedSecret;
   }
-  return secret;
+  cachedSecret = secret;
+  return cachedSecret;
 }
 
 export function signToken(payload: {
