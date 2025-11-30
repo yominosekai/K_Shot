@@ -25,6 +25,7 @@ interface MaterialLibraryModalsProps {
   selectedFolder: FolderNormalized | null;
   isEditModalOpen: boolean;
   closeEditModal: () => void;
+  closeEditModalWithRefresh: () => void;
   editMaterial: MaterialNormalized | null;
   currentPath: string | null;
   categories: Category[];
@@ -62,6 +63,7 @@ export default function MaterialLibraryModals({
   selectedFolder,
   isEditModalOpen,
   closeEditModal,
+  closeEditModalWithRefresh,
   editMaterial,
   currentPath,
   categories,
@@ -109,7 +111,7 @@ export default function MaterialLibraryModals({
       <MaterialCreationModal
         isOpen={isEditModalOpen}
         onClose={closeEditModal}
-        onSuccess={closeEditModal}
+        onSuccess={closeEditModalWithRefresh}
         categories={categories as any}
         editMaterial={editMaterial}
         initialFolderPath={editMaterial?.folder_path || currentPath || undefined}

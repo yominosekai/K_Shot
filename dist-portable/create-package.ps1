@@ -56,6 +56,11 @@ try {
     Push-Location $tempProdModules
     Write-Host "   npm install --production を実行中..." -ForegroundColor Gray
     npm install --production --silent 2>&1 | Out-Null
+    
+    # next.config.tsを使用するため、TypeScriptを追加インストール（package.jsonは変更しない）
+    Write-Host "   TypeScriptを追加インストール中（next.config.ts用）..." -ForegroundColor Gray
+    npm install typescript@^5.7.0 --no-save --silent 2>&1 | Out-Null
+    
     Pop-Location
     
     if (Test-Path (Join-Path $tempProdModules "node_modules")) {

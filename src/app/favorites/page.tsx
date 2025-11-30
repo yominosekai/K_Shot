@@ -1,50 +1,38 @@
 'use client';
 
-import { useEffect, useState, useMemo, FormEvent, useCallback } from 'react';
-import { Heart, Grid, List, RefreshCw, Search, Trash2, Download, Info, Bell, FileEdit, Copy } from 'lucide-react';
+import { useEffect, useState, useMemo, FormEvent } from 'react';
+import { Heart, Grid, List, Search, RefreshCw } from 'lucide-react';
 import MaterialCard from '@/components/MaterialCard';
 import MaterialListItem from '@/components/MaterialListItem';
 import MaterialModal from '@/components/MaterialModal';
 import CommentModal from '@/components/CommentModal';
 import Toast from '@/components/Toast';
-import ContextMenu, { type ContextMenuItem } from '@/components/ContextMenu';
+import ContextMenu from '@/components/ContextMenu';
 import MaterialCreationModal from '@/components/MaterialCreationModal';
 import NotificationSendModal from '@/components/NotificationSendModal';
 import MaterialInfoModal from '@/components/MaterialInfoModal';
 import type { MaterialNormalized } from '@/features/materials/types';
 import { useMaterialsPage } from '@/shared/hooks/useMaterialsPage';
-import { useAuth } from '@/contexts/AuthContext';
-import { useConfirmDialog } from '@/contexts/ConfirmDialogContext';
-import { downloadMaterialAsZip } from '@/shared/lib/utils/material-download';
 import { useCategories } from '@/contexts/CategoriesContext';
+import { useFavoritesViewMode } from './hooks/useFavoritesViewMode';
+import { useFavoritesModals } from './hooks/useFavoritesModals';
+import { useFavoritesContextMenu } from './hooks/useFavoritesContextMenu';
+import { useFavoritesCleanup } from './hooks/useFavoritesCleanup';
+import { useFavoritesToast } from './hooks/useFavoritesToast';
 
 export default function FavoritesPage() {
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [mounted, setMounted] = useState(false);
   const [localSearch, setLocalSearch] = useState('');
-  const [selectedMaterial, setSelectedMaterial] = useState<MaterialNormalized | null>(null);
-  const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
-  const [commentMaterial, setCommentMaterial] = useState<MaterialNormalized | null>(null);
-  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
-  const [isCleaningUp, setIsCleaningUp] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [isToastVisible, setIsToastVisible] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
-  const [editMaterial, setEditMaterial] = useState<MaterialNormalized | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [notificationMaterial, setNotificationMaterial] = useState<MaterialNormalized | null>(null);
-  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
-  const [infoMaterial, setInfoMaterial] = useState<MaterialNormalized | null>(null);
-  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-
-  const { user } = useAuth();
-  const confirmDialog = useConfirmDialog();
+  
   const { categories } = useCategories();
-
-  const showToast = useCallback((message: string) => {
-    setToastMessage(message);
-    setIsToastVisible(true);
-  }, []);
+  
+  // 表示モード管理
+  const { viewMode, setViewMode, mounted } = useFavoritesViewMode();
+  
+  // トースト管理
+  const toast = useFavoritesToast();
+  
+  // モーダル管理
+  const modals = useFavoritesModals();
 
   const {
     materials,
@@ -63,6 +51,31 @@ export default function FavoritesPage() {
     updateMaterialCommentCount,
     bookmarks,
   } = useMaterialsPage();
+
+  // クリーンアップ処理
+  const cleanup = useFavoritesCleanup({
+    refreshMaterials,
+    showToast: toast.showToast,
+    bookmarks,
+  });
+
+  // コンテキストメニュー管理
+  const contextMenu = useFavoritesContextMenu({
+    showToast: toast.showToast,
+    onEditMaterial: modals.openEditModal,
+    onShowInfo: modals.openInfoModal,
+    onSendNotification: modals.openNotificationModal,
+    onRefresh: async () => {
+      try {
+        await refreshMaterials();
+        toast.showToast('情報を更新しました');
+      } catch (err) {
+        console.error('更新エラー:', err);
+        toast.showToast('更新に失敗しました');
+      }
+    },
+    onCleanup: cleanup.handleCleanup,
+  });
 
   // 初回にお気に入りフィルターを適用
   useEffect(() => {
@@ -91,286 +104,19 @@ export default function FavoritesPage() {
     setLocalSearch(searchTerm);
   }, [searchTerm]);
 
-  // 表示モードの初期化
-  useEffect(() => {
-    setMounted(true);
-    if (typeof window !== 'undefined') {
-      const savedViewMode = localStorage.getItem('favorites_viewMode') as 'grid' | 'list' | null;
-      if (savedViewMode === 'grid' || savedViewMode === 'list') {
-        setViewMode(savedViewMode);
-      }
-    }
-  }, []);
-
-  // 表示モードを保存
-  useEffect(() => {
-    if (mounted && typeof window !== 'undefined') {
-      localStorage.setItem('favorites_viewMode', viewMode);
-    }
-  }, [viewMode, mounted]);
-
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSearchTerm(localSearch.trim());
   };
 
-  const handleRefresh = useCallback(async () => {
-    try {
-      await refreshMaterials();
-      showToast('情報を更新しました');
-    } catch (err) {
-      console.error('更新エラー:', err);
-      showToast('更新に失敗しました');
-    }
-  }, [refreshMaterials, showToast]);
-
-  const handleCleanup = useCallback(async () => {
-    if (!user?.id) {
-      return;
-    }
-
-    setIsCleaningUp(true);
-    try {
-      // まず削除対象をチェック（check_only=true）
-      const checkResponse = await fetch(`/api/users/${encodeURIComponent(user.id)}/bookmarks/cleanup?check_only=true`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!checkResponse.ok) {
-        showToast('お気に入りのチェックに失敗しました');
-        return;
-      }
-
-      const checkData = await checkResponse.json();
-      
-      if (!checkData.success) {
-        showToast(checkData.error || 'お気に入りのチェックに失敗しました');
-        return;
-      }
-
-      // 削除対象がない場合
-      if (checkData.removedCount === 0) {
-        showToast('削除するお気に入りがありません');
-        return;
-      }
-
-      // 削除対象がある場合、確認モーダルを表示
-      const removedMaterials = checkData.removedMaterials || [];
-      const removedList = removedMaterials
-        .map((m: { id: string; title?: string }) => `・${m.title || m.id}`)
-        .join('\n');
-
-      const confirmed = await confirmDialog({
-        title: '存在しない資料を削除',
-        message: (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              以下の{removedMaterials.length}件の存在しない資料をお気に入りから削除しますか？
-            </p>
-            <div className="max-h-60 overflow-y-auto bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-              <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap font-sans">
-                {removedList}
-              </pre>
-            </div>
-          </div>
-        ),
-        confirmText: '削除する',
-        cancelText: 'キャンセル',
-        variant: 'danger',
-      });
-
-      if (!confirmed) {
-        return;
-      }
-
-      // 削除を実行（check_onlyなし）
-      const deleteResponse = await fetch(`/api/users/${encodeURIComponent(user.id)}/bookmarks/cleanup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (deleteResponse.ok) {
-        const deleteData = await deleteResponse.json();
-        if (deleteData.success) {
-          // お気に入り一覧を再取得
-          if (bookmarks?.fetchBookmarks) {
-            await bookmarks.fetchBookmarks();
-          }
-          // 資料一覧を再取得
-          await refreshMaterials();
-          
-          // 成功メッセージを表示
-          showToast(`${removedMaterials.length}件の存在しない資料をお気に入りから削除しました`);
-        } else {
-          showToast(deleteData.error || 'お気に入りの削除に失敗しました');
-        }
-      } else {
-        showToast('お気に入りの削除に失敗しました');
-      }
-    } catch (err) {
-      console.error('お気に入りクリーンアップエラー:', err);
-      showToast('お気に入りのクリーンアップに失敗しました');
-    } finally {
-      setIsCleaningUp(false);
-    }
-  }, [user?.id, confirmDialog, bookmarks, refreshMaterials, showToast]);
-
-  // 資料アイテムの右クリックメニューの処理
-  const handleMaterialContextMenu = useCallback((e: React.MouseEvent, material: MaterialNormalized) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const items: ContextMenuItem[] = [
-      {
-        label: 'ダウンロード',
-        icon: <Download className="w-4 h-4" />,
-        onClick: async () => {
-          try {
-            await downloadMaterialAsZip(material.id);
-            showToast('ダウンロードを開始しました');
-          } catch (err) {
-            console.error('ダウンロードエラー:', err);
-            showToast(err instanceof Error ? err.message : 'ダウンロードに失敗しました');
-          }
-        },
-      },
-      {
-        label: '編集',
-        icon: <FileEdit className="w-4 h-4" />,
-        onClick: async () => {
-          try {
-            // 詳細情報を取得
-            const response = await fetch(`/api/materials/${material.id}`);
-            if (response.ok) {
-              const data = await response.json();
-              if (data.success && data.material) {
-                setEditMaterial(data.material);
-                setIsEditModalOpen(true);
-                return;
-              }
-            }
-            // 詳細取得に失敗した場合は基本情報のみで編集
-            setEditMaterial(material);
-            setIsEditModalOpen(true);
-          } catch (err) {
-            console.error('資料詳細取得エラー:', err);
-            // エラーが発生した場合は基本情報のみで編集
-            setEditMaterial(material);
-            setIsEditModalOpen(true);
-          }
-        },
-      },
-      {
-        label: 'リンクをコピー',
-        icon: <Copy className="w-4 h-4" />,
-        onClick: () => {
-          const url = `${window.location.origin}/materials?material=${encodeURIComponent(material.id)}`;
-          navigator.clipboard.writeText(url).then(() => {
-            showToast('リンクをコピーしました');
-          }).catch(() => {
-            // フォールバック
-            const textArea = document.createElement('textarea');
-            textArea.value = url;
-            textArea.style.position = 'fixed';
-            textArea.style.opacity = '0';
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            showToast('リンクをコピーしました');
-          });
-        },
-      },
-      {
-        label: 'ファイル情報',
-        icon: <Info className="w-4 h-4" />,
-        onClick: async () => {
-          try {
-            // 詳細情報を取得
-            const response = await fetch(`/api/materials/${material.id}`);
-            if (response.ok) {
-              const data = await response.json();
-              if (data.success && data.material) {
-                // 既存のmaterialオブジェクトの統計情報（bookmark_count, views, likes）を保持
-                setInfoMaterial({
-                  ...data.material,
-                  bookmark_count: material.bookmark_count ?? data.material.bookmark_count ?? 0,
-                  views: material.views ?? data.material.views ?? 0,
-                  likes: material.likes ?? data.material.likes ?? 0,
-                });
-                setIsInfoModalOpen(true);
-                return;
-              }
-            }
-            // 詳細取得に失敗した場合は基本情報のみで表示
-            setInfoMaterial(material);
-            setIsInfoModalOpen(true);
-          } catch (err) {
-            console.error('資料詳細取得エラー:', err);
-            // エラーが発生した場合は基本情報のみで表示
-            setInfoMaterial(material);
-            setIsInfoModalOpen(true);
-          }
-        },
-      },
-      {
-        label: '通知',
-        icon: <Bell className="w-4 h-4" />,
-        onClick: () => {
-          setNotificationMaterial(material);
-          setIsNotificationModalOpen(true);
-        },
-      },
-    ];
-
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items,
-    });
-  }, [showToast]);
-
-  // 背景の右クリックメニューの処理
-  const handleBackgroundContextMenu = useCallback((e: React.MouseEvent) => {
-    // 資料カード/リストアイテムの上でない場合のみ処理
-    const target = e.target as HTMLElement;
-    if (target.closest('[data-material-item]')) {
-      return; // 資料アイテムの上なので無視
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const items: ContextMenuItem[] = [
-      {
-        label: '最新の情報に更新',
-        icon: <RefreshCw className="w-4 h-4" />,
-        onClick: handleRefresh,
-      },
-      {
-        label: '存在しない資料をチェック',
-        icon: <Trash2 className="w-4 h-4" />,
-        onClick: handleCleanup,
-      },
-    ];
-
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      items,
-    });
-  }, [handleRefresh, handleCleanup]);
-
   const handleOpenMaterial = (material: MaterialNormalized) => {
-    setSelectedMaterial(material);
-    setIsMaterialModalOpen(true);
+    modals.openMaterialModal(material);
   };
 
   const favoriteCount = useMemo(() => materials.length, [materials]);
 
   return (
-    <div className="flex-1 overflow-auto p-6" onContextMenu={handleBackgroundContextMenu}>
+    <div className="flex-1 overflow-auto p-6" onContextMenu={contextMenu.handleBackgroundContextMenu}>
       <div className="max-w-7xl mx-auto space-y-6">
         <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -437,7 +183,7 @@ export default function FavoritesPage() {
         </section>
 
         {/* コンテンツエリア */}
-        <div className="min-h-[calc(100vh-300px)]" onContextMenu={handleBackgroundContextMenu}>
+        <div className="min-h-[calc(100vh-300px)]" onContextMenu={contextMenu.handleBackgroundContextMenu}>
           {error && (
             <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg px-4 py-3">
               {error}
@@ -475,7 +221,7 @@ export default function FavoritesPage() {
                 <div
                   key={material.id}
                   data-material-item
-                  onContextMenu={(e) => handleMaterialContextMenu(e, material)}
+                  onContextMenu={(e) => contextMenu.handleMaterialContextMenu(e, material)}
                 >
                   <MaterialCard
                     material={material}
@@ -483,8 +229,7 @@ export default function FavoritesPage() {
                     onBookmark={handleBookmark}
                     isBookmarked={bookmarkedIds.has(material.id)}
                     onCommentClick={(materialId) => {
-                      setCommentMaterial(material);
-                      setIsCommentModalOpen(true);
+                      modals.openCommentModal(material);
                     }}
                   />
                 </div>
@@ -492,7 +237,7 @@ export default function FavoritesPage() {
                 <div
                   key={material.id}
                   data-material-item
-                  onContextMenu={(e) => handleMaterialContextMenu(e, material)}
+                  onContextMenu={(e) => contextMenu.handleMaterialContextMenu(e, material)}
                 >
                   <MaterialListItem
                     material={material}
@@ -501,8 +246,7 @@ export default function FavoritesPage() {
                     isBookmarked={bookmarkedIds.has(material.id)}
                     creatorCache={creatorCache}
                     onCommentClick={(materialId) => {
-                      setCommentMaterial(material);
-                      setIsCommentModalOpen(true);
+                      modals.openCommentModal(material);
                     }}
                   />
                 </div>
@@ -514,19 +258,15 @@ export default function FavoritesPage() {
       </div>
 
       <MaterialModal
-        material={selectedMaterial}
-        isOpen={isMaterialModalOpen}
-        onClose={() => {
-          setIsMaterialModalOpen(false);
-          setSelectedMaterial(null);
-        }}
+        material={modals.selectedMaterial}
+        isOpen={modals.isMaterialModalOpen}
+        onClose={modals.closeMaterialModal}
         onBookmark={handleBookmark}
-        isBookmarked={selectedMaterial ? bookmarkedIds.has(selectedMaterial.id) : false}
+        isBookmarked={modals.selectedMaterial ? bookmarkedIds.has(modals.selectedMaterial.id) : false}
         onCommentClick={
-          selectedMaterial
+          modals.selectedMaterial
             ? () => {
-                setCommentMaterial(selectedMaterial);
-                setIsCommentModalOpen(true);
+                modals.openCommentModal(modals.selectedMaterial!);
               }
             : undefined
         }
@@ -535,12 +275,9 @@ export default function FavoritesPage() {
       />
 
       <CommentModal
-        material={commentMaterial}
-        isOpen={isCommentModalOpen}
-        onClose={() => {
-          setIsCommentModalOpen(false);
-          setCommentMaterial(null);
-        }}
+        material={modals.commentMaterial}
+        isOpen={modals.isCommentModalOpen}
+        onClose={modals.closeCommentModal}
         onCommentAdded={(materialId) => {
           updateMaterialCommentCount(materialId);
         }}
@@ -548,57 +285,47 @@ export default function FavoritesPage() {
 
       {/* 資料編集モーダル */}
       <MaterialCreationModal
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setEditMaterial(null);
-        }}
+        isOpen={modals.isEditModalOpen}
+        onClose={modals.closeEditModal}
         onSuccess={() => {
-          setIsEditModalOpen(false);
-          setEditMaterial(null);
+          modals.closeEditModal();
           refreshMaterials();
         }}
         categories={categories as any}
-        editMaterial={editMaterial}
-        initialFolderPath={editMaterial?.folder_path || undefined}
+        editMaterial={modals.editMaterial}
+        initialFolderPath={modals.editMaterial?.folder_path || undefined}
       />
 
       {/* 通知送信モーダル */}
       <NotificationSendModal
-        isOpen={isNotificationModalOpen}
-        onClose={() => {
-          setIsNotificationModalOpen(false);
-          setNotificationMaterial(null);
-        }}
-        material={notificationMaterial}
+        isOpen={modals.isNotificationModalOpen}
+        onClose={modals.closeNotificationModal}
+        material={modals.notificationMaterial}
         onSuccess={() => {
-          showToast('通知を送信しました');
+          toast.showToast('通知を送信しました');
         }}
       />
 
       {/* ファイル情報モーダル */}
       <MaterialInfoModal
-        isOpen={isInfoModalOpen}
-        onClose={() => {
-          setIsInfoModalOpen(false);
-          setInfoMaterial(null);
-        }}
-        material={infoMaterial}
+        isOpen={modals.isInfoModalOpen}
+        onClose={modals.closeInfoModal}
+        material={modals.infoMaterial}
       />
 
       <Toast
-        message={toastMessage}
-        isVisible={isToastVisible}
-        onClose={() => setIsToastVisible(false)}
+        message={toast.toastMessage}
+        isVisible={toast.isToastVisible}
+        onClose={toast.hideToast}
       />
 
       {/* コンテキストメニュー */}
-      {contextMenu && (
+      {contextMenu.contextMenu && (
         <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          items={contextMenu.items}
-          onClose={() => setContextMenu(null)}
+          x={contextMenu.contextMenu.x}
+          y={contextMenu.contextMenu.y}
+          items={contextMenu.contextMenu.items}
+          onClose={contextMenu.closeContextMenu}
         />
       )}
     </div>

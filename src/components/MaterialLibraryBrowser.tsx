@@ -226,6 +226,7 @@ export default function MaterialLibraryBrowser({
         selectedFolder={modals.selectedFolder}
         isEditModalOpen={modals.isEditModalOpen}
         closeEditModal={modals.closeEditModal}
+        closeEditModalWithRefresh={modals.closeEditModalWithRefresh}
         editMaterial={modals.editMaterial}
         currentPath={modals.currentPath}
         categories={categories as any}

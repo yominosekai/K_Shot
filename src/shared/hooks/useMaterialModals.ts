@@ -85,6 +85,11 @@ export function useMaterialModals({ onRefresh, currentPath, showToast }: UseMate
   const closeEditModal = useCallback(() => {
     setIsEditModalOpen(false);
     setEditMaterial(null);
+  }, []);
+
+  const closeEditModalWithRefresh = useCallback(() => {
+    setIsEditModalOpen(false);
+    setEditMaterial(null);
     if (onRefresh) {
       onRefresh();
     }
@@ -269,6 +274,7 @@ export function useMaterialModals({ onRefresh, currentPath, showToast }: UseMate
     isEditModalOpen,
     openEditModal,
     closeEditModal,
+    closeEditModalWithRefresh,
     // 資料移動モーダル
     moveMaterial,
     isMoveModalOpen,

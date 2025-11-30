@@ -105,3 +105,6 @@ memo/2025-11-17_node-memory.md
 
 # public内の参照されていないドキュメント（GitHubには含めない）
 public/help/images/user-manual/README.md
+
+# Cursor調査用ディレクトリ（GitHubには含めない）
+cursor/

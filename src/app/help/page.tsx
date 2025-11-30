@@ -14,7 +14,18 @@ import { manualDocs, filterDocsByPermission, isAdminOnlyDoc } from '@/content/he
 import { requireAuth, isAdmin } from '@/shared/lib/auth/middleware';
 
 const getManualContent = (filePath: string) => {
-  const content = fs.readFileSync(path.join(process.cwd(), filePath), 'utf-8');
+  // ビルド時はpublic/content/help、開発時はsrc/content/helpを優先的に試す
+  // src/content/helpのパスをpublic/content/helpに変換
+  const publicPath = filePath.replace('src/content/help', 'public/content/help');
+  
+  let content: string;
+  try {
+    // まずpublic/content/helpを試す（ビルド後の本番環境）
+    content = fs.readFileSync(path.join(process.cwd(), publicPath), 'utf-8');
+  } catch {
+    // なければsrc/content/helpを試す（開発環境）
+    content = fs.readFileSync(path.join(process.cwd(), filePath), 'utf-8');
+  }
   // 先頭のh1タイトル行、説明文、区切り線（---）を削除
   // パターン: # タイトル\n\n説明文\n\n---\n\n までを削除
   const lines = content.split('\n');
