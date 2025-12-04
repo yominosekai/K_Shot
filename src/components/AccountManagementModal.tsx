@@ -38,6 +38,7 @@ interface AccountListProps {
 const ROLE_LABELS: Record<UserType['role'], string> = {
   admin: '管理者',
   instructor: '教育者',
+  training: '教育訓練',
   user: '一般ユーザー',
 };
 

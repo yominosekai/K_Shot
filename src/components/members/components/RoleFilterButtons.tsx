@@ -50,6 +50,16 @@ export default function RoleFilterButtons({
         教育者
       </button>
       <button
+        onClick={() => onRoleChange('training')}
+        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          selectedRole === 'training'
+            ? 'bg-blue-500 text-white'
+            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+        }`}
+      >
+        教育訓練
+      </button>
+      <button
         onClick={() => onRoleChange('user')}
         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
           selectedRole === 'user'

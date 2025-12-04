@@ -7,6 +7,7 @@ import { X, User, Shield, GraduationCap, Lock } from 'lucide-react';
 import Image from 'next/image';
 import type { User as UserType } from '@/features/auth/types';
 import { useUsers } from '@/contexts/UsersContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface RoleChangeModalProps {
   isOpen: boolean;
@@ -22,8 +23,9 @@ export default function RoleChangeModal({
   onSuccess,
 }: RoleChangeModalProps) {
   const { getAvatarUrl } = useUsers();
+  const { updateUser: updateAuthUser } = useAuth();
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
-  const [newRole, setNewRole] = useState<'user' | 'instructor' | 'admin'>('user');
+  const [newRole, setNewRole] = useState<'user' | 'instructor' | 'admin' | 'training'>('user');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export default function RoleChangeModal({
     if (isOpen && currentUser) {
       // 全ユーザー（管理者含む）が自分自身を自動選択
       setSelectedUser(currentUser);
-      setNewRole(currentUser.role as 'user' | 'instructor' | 'admin');
+      setNewRole(currentUser.role as 'user' | 'instructor' | 'admin' | 'training');
       setPassword('');
       setError(null);
     }
@@ -60,7 +62,7 @@ export default function RoleChangeModal({
       return;
     }
 
-    // 新しい権限が一般ユーザー以外（教育者・管理者）の場合はパスワード必須
+    // 新しい権限が一般ユーザー以外（教育者・管理者・教育訓練）の場合はパスワード必須
     const requiresPassword = newRole !== 'user';
     if (requiresPassword && !password) {
       setError('パスワードを入力してください');
@@ -88,7 +90,7 @@ export default function RoleChangeModal({
       }
       // IDにハイフンが含まれるため、URLエンコードが必要
       const encodedId = encodeURIComponent(targetUserId);
-      // 新しい権限が一般ユーザー以外（教育者・管理者）の場合はパスワードを送信
+      // 新しい権限が一般ユーザー以外（教育者・管理者・教育訓練）の場合はパスワードを送信
       const requiresPassword = newRole !== 'user';
       
       const response = await fetch(`/api/users/${encodedId}/role`, {
@@ -118,6 +120,12 @@ export default function RoleChangeModal({
       // 成功
       setPassword('');
       setError(null);
+      
+      // 自分自身の権限変更の場合は、セッション（Cookie）を更新
+      if (currentUser && selectedUser && currentUser.id === selectedUser.id && data.user) {
+        updateAuthUser(data.user);
+      }
+      
       if (onSuccess) {
         onSuccess();
       }
@@ -135,6 +143,7 @@ export default function RoleChangeModal({
       admin: '管理者',
       instructor: '教育者',
       user: '一般ユーザー',
+      training: '教育訓練',
     };
     return labels[role] || role;
   };
@@ -232,6 +241,18 @@ export default function RoleChangeModal({
                 />
                 <GraduationCap className="w-5 h-5 text-blue-400" />
                 <span className="text-gray-900 dark:text-gray-100">教育者</span>
+              </label>
+              <label className="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <input
+                  type="radio"
+                  name="role"
+                  value="training"
+                  checked={newRole === 'training'}
+                  onChange={() => setNewRole('training')}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <GraduationCap className="w-5 h-5 text-yellow-400" />
+                <span className="text-gray-900 dark:text-gray-100">教育訓練</span>
               </label>
               <label className="flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                 <input

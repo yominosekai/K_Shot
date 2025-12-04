@@ -110,12 +110,12 @@ export async function requireAuth(): Promise<AuthResult | AuthError> {
 /**
  * 権限チェック
  * @param user ユーザー情報
- * @param permission 必要な権限（'admin' | 'instructor' | 'user'）
+ * @param permission 必要な権限（'admin' | 'instructor' | 'user' | 'training'）
  * @returns 権限がある場合はtrue、ない場合はfalse
  */
 export function hasPermission(
   user: User | null,
-  permission: 'admin' | 'instructor' | 'user'
+  permission: 'admin' | 'instructor' | 'user' | 'training'
 ): boolean {
   if (!user) {
     return false;
@@ -143,11 +143,11 @@ export function isInstructor(user: User | null): boolean {
 
 /**
  * 認証必須 + 権限チェック
- * @param permission 必要な権限（'admin' | 'instructor' | 'user'）
+ * @param permission 必要な権限（'admin' | 'instructor' | 'user' | 'training'）
  * @returns 認証成功かつ権限がある場合はユーザー情報、それ以外はNextResponse
  */
 export async function requireRole(
-  permission: 'admin' | 'instructor' | 'user'
+  permission: 'admin' | 'instructor' | 'user' | 'training'
 ): Promise<AuthResult | AuthError> {
   const authResult = await requireAuth();
 

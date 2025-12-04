@@ -15,7 +15,7 @@ const MODULE_NAME = 'api/admin/system-config/role-password';
  * 
  * リクエストボディ:
  * {
- *   role: 'admin' | 'instructor',
+ *   role: 'admin' | 'instructor' | 'training',
  *   currentPassword: string,
  *   newPassword: string
  * }
@@ -32,9 +32,9 @@ export async function PUT(request: NextRequest) {
     const { role, currentPassword, newPassword } = body;
 
     // バリデーション
-    if (!role || (role !== 'admin' && role !== 'instructor')) {
+    if (!role || (role !== 'admin' && role !== 'instructor' && role !== 'training')) {
       return NextResponse.json(
-        { success: false, error: '権限は "admin" または "instructor" である必要があります' },
+        { success: false, error: '権限は "admin"、"instructor" または "training" である必要があります' },
         { status: 400 }
       );
     }
@@ -68,7 +68,12 @@ export async function PUT(request: NextRequest) {
     if (!currentPasswordHash) {
       error(MODULE_NAME, `権限変更パスワードが設定されていません: role=${role}`);
       return NextResponse.json(
-        { success: false, error: `${role === 'instructor' ? '教育者' : '管理者'}の権限変更パスワードが設定されていません` },
+        {
+          success: false,
+          error: `${
+            role === 'instructor' ? '教育者' : role === 'training' ? '教育訓練' : '管理者'
+          }の権限変更パスワードが設定されていません`,
+        },
         { status: 500 }
       );
     }
@@ -115,7 +120,9 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `${role === 'instructor' ? '教育者' : '管理者'}の権限変更パスワードを更新しました`,
+      message: `${
+        role === 'instructor' ? '教育者' : role === 'training' ? '教育訓練' : '管理者'
+      }の権限変更パスワードを更新しました`,
     });
   } catch (err) {
     error(MODULE_NAME, '権限変更パスワード更新エラー:', err);

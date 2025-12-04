@@ -96,7 +96,7 @@ export async function PUT(
       );
     }
 
-    if (!['user', 'instructor', 'admin'].includes(new_role)) {
+    if (!['user', 'instructor', 'admin', 'training'].includes(new_role)) {
       return NextResponse.json(
         { success: false, error: '無効な権限です' },
         { status: 400 }
@@ -113,7 +113,7 @@ export async function PUT(
       );
     }
 
-    // 新しい権限が一般ユーザー以外（教育者・管理者）の場合はパスワード検証が必要
+    // 新しい権限が一般ユーザー以外（教育者・管理者・教育訓練）の場合はパスワード検証が必要
     const requiresPassword = new_role !== 'user';
     if (requiresPassword) {
       if (!password) {
@@ -129,7 +129,11 @@ export async function PUT(
       if (!passwordHash) {
         error(MODULE_NAME, `権限変更パスワードが設定されていません: role=${new_role}`);
         return NextResponse.json(
-          { success: false, error: `${new_role === 'instructor' ? '教育者' : '管理者'}の権限変更パスワードが設定されていません。管理者に連絡してください。` },
+          {
+            success: false,
+            error:
+              `${new_role === 'instructor' ? '教育者' : new_role === 'training' ? '教育訓練' : '管理者'}の権限変更パスワードが設定されていません。管理者に連絡してください。`,
+          },
           { status: 500 }
         );
       }
@@ -154,7 +158,7 @@ export async function PUT(
     // 権限を更新
     try {
       const updatedUser = await updateUserData(userId, {
-        role: new_role as 'user' | 'instructor' | 'admin',
+        role: new_role as 'user' | 'instructor' | 'admin' | 'training',
       });
 
       if (!updatedUser) {

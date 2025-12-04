@@ -17,6 +17,10 @@ export function checkPermission(
       return user.role === 'admin';
     case 'instructor':
       return user.role === 'admin' || user.role === 'instructor';
+    case 'training':
+      // 教育訓練ロール専用の権限。
+      // 管理者は全権限を含む想定のため、training権限も付与する。
+      return user.role === 'admin' || user.role === 'training';
     case 'user':
       return true;
     default:

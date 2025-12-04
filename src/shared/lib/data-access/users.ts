@@ -34,7 +34,7 @@ function mapRowToUser(row: UserRow): User {
     email: row.email,
     department_id: row.department_id || undefined,
     department: row.department || undefined,
-    role: row.role as 'admin' | 'instructor' | 'user',
+    role: row.role as User['role'],
     is_active: row.is_active === 1,
     created_date: row.created_date,
     last_login: row.last_login,

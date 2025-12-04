@@ -29,6 +29,7 @@ export default function UserCard({ user, onClick, onContextMenu }: UserCardProps
       admin: '管理者',
       instructor: '教育者',
       user: '一般ユーザー',
+      training: '教育訓練',
     };
     return labels[role] || role;
   };
@@ -38,6 +39,7 @@ export default function UserCard({ user, onClick, onContextMenu }: UserCardProps
       admin: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
       instructor: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
       user: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+      training: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
     };
     return colors[role] || colors.user;
   };

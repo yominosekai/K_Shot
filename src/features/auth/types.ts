@@ -7,7 +7,7 @@ export interface User {
   email: string;
   department_id?: string;
   department?: string;
-  role: 'admin' | 'instructor' | 'user';
+  role: 'admin' | 'instructor' | 'user' | 'training';
   is_active: boolean;
   created_date: string;
   last_login: string;
@@ -26,7 +26,7 @@ export interface SessionUser {
   username: string;
   display_name: string;
   email: string;
-  role: 'admin' | 'instructor' | 'user';
+  role: 'admin' | 'instructor' | 'user' | 'training';
   is_active: boolean;
   last_login: string; // 最終ログイン時刻（フロントエンド側での更新判定に使用）
   // avatar、bio、skills等は除外（サーバーから再取得）

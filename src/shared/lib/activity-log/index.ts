@@ -139,7 +139,7 @@ export function recordMaterialViewActivityEvent(userId: string, materialId: stri
 
 export function recordRolePasswordChangeActivityEvent(
   userId: string,
-  role: 'admin' | 'instructor'
+  role: 'admin' | 'instructor' | 'training'
 ): void {
   const today = getJSTTodayString();
   const now = getJSTNowISOString();

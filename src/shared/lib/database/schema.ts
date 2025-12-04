@@ -172,6 +172,26 @@ const TABLE_STATEMENTS: Statement[] = [
     response_date TEXT,
     response_by TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );`,
+  `CREATE TABLE IF NOT EXISTS skill_phase_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    item TEXT NOT NULL,
+    sub_category TEXT NOT NULL,
+    small_category TEXT NOT NULL,
+    phase INTEGER NOT NULL CHECK(phase >= 1 AND phase <= 5),
+    name TEXT NOT NULL,
+    description TEXT,
+    display_order INTEGER DEFAULT NULL
+  );`,
+  `CREATE TABLE IF NOT EXISTS skill_phase_item_materials (
+    skill_phase_item_id INTEGER NOT NULL,
+    material_id TEXT NOT NULL,
+    display_order INTEGER DEFAULT NULL,
+    created_date TEXT NOT NULL,
+    PRIMARY KEY (skill_phase_item_id, material_id),
+    FOREIGN KEY (skill_phase_item_id) REFERENCES skill_phase_items(id) ON DELETE CASCADE,
+    FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE
   );`
 ];
 
@@ -207,7 +227,14 @@ const INDEX_STATEMENTS: Statement[] = [
   'CREATE INDEX IF NOT EXISTS idx_device_tokens_user_id ON device_tokens(user_id);',
   'CREATE INDEX IF NOT EXISTS idx_feedback_metadata_user_id ON feedback_metadata(user_id);',
   'CREATE INDEX IF NOT EXISTS idx_feedback_metadata_created_date ON feedback_metadata(created_date);',
-  'CREATE INDEX IF NOT EXISTS idx_feedback_metadata_status ON feedback_metadata(status);'
+  'CREATE INDEX IF NOT EXISTS idx_feedback_metadata_status ON feedback_metadata(status);',
+  'CREATE INDEX IF NOT EXISTS idx_skill_phase_items_category ON skill_phase_items(category);',
+  'CREATE INDEX IF NOT EXISTS idx_skill_phase_items_item ON skill_phase_items(item);',
+  'CREATE INDEX IF NOT EXISTS idx_skill_phase_items_category_item ON skill_phase_items(category, item);',
+  'CREATE INDEX IF NOT EXISTS idx_skill_phase_items_phase ON skill_phase_items(phase);',
+  'CREATE INDEX IF NOT EXISTS idx_skill_phase_items_display_order ON skill_phase_items(display_order);',
+  'CREATE INDEX IF NOT EXISTS idx_skill_phase_item_materials_item_id ON skill_phase_item_materials(skill_phase_item_id);',
+  'CREATE INDEX IF NOT EXISTS idx_skill_phase_item_materials_material_id ON skill_phase_item_materials(material_id);'
 ];
 
 const DEFAULT_MATERIAL_TYPES = [
@@ -270,6 +297,7 @@ function ensureRoleChangePasswords(db: SqliteDatabase, now: string): void {
   try {
     const adminKey = 'role_change_password_hash_admin';
     const instructorKey = 'role_change_password_hash_instructor';
+    const trainingKey = 'role_change_password_hash_training';
 
     if (!db.prepare('SELECT key FROM system_config WHERE key = ?').get(adminKey)) {
       const adminPasswordHash = hashPassword('admin');
@@ -283,6 +311,13 @@ function ensureRoleChangePasswords(db: SqliteDatabase, now: string): void {
       db.prepare('INSERT INTO system_config (key, value, updated_date, updated_by) VALUES (?, ?, ?, ?)')
         .run(instructorKey, instructorPasswordHash, now, 'system');
       info(MODULE_NAME, 'デフォルト教育者権限変更パスワードを設定しました');
+    }
+
+    if (!db.prepare('SELECT key FROM system_config WHERE key = ?').get(trainingKey)) {
+      const trainingPasswordHash = hashPassword('training');
+      db.prepare('INSERT INTO system_config (key, value, updated_date, updated_by) VALUES (?, ?, ?, ?)')
+        .run(trainingKey, trainingPasswordHash, now, 'system');
+      info(MODULE_NAME, 'デフォルト教育訓練権限変更パスワードを設定しました');
     }
   } catch (err) {
     error(MODULE_NAME, 'デフォルトパスワード設定エラー:', err);

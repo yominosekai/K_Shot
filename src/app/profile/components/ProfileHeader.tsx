@@ -49,6 +49,8 @@ export default function ProfileHeader({
                 ? '管理者'
                 : user.role === 'instructor'
                 ? '教育者'
+                : user.role === 'training'
+                ? '教育訓練'
                 : '一般ユーザー'}
             </span>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, FileText, BarChart, Settings, Users, Trash2, Database, AlertTriangle, Heart, MessageSquare, ClipboardCheck } from 'lucide-react';
+import { Home, FileText, BarChart, Settings, Users, Trash2, Database, AlertTriangle, Heart, MessageSquare, ClipboardCheck, GraduationCap } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,10 +35,15 @@ const feedbackNavigation = [
   { id: 'feedback', icon: MessageSquare, label: 'ご意見・ご要望', href: '/feedback' },
 ];
 
+const trainingNavigation = [
+  { id: 'training-skill-mapping', icon: GraduationCap, label: 'スキルマップ', href: '/training/skill-mapping' },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isTraining = user?.role === 'training' || user?.role === 'admin';
 
   return (
     <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto p-4">
@@ -63,6 +68,31 @@ export default function Sidebar() {
             </Link>
           );
         })}
+        {/* スキルマップ（教育訓練ロール以上） */}
+        {isTraining && (
+          <>
+            {trainingNavigation.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href || 
+                (item.href !== '/' && pathname?.startsWith(item.href));
+              
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                    isActive
+                      ? 'bg-yellow-50 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+          </>
+        )}
         {/* 利用状況（管理者のみ） */}
         {isAdmin && (
           <Link
@@ -176,6 +206,7 @@ export default function Sidebar() {
           );
         })}
       </div>
+
     </aside>
   );
 }

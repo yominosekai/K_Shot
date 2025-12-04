@@ -14,7 +14,8 @@ const MODULE_NAME = 'api/admin/system-config/role-password/check-default';
  * レスポンス:
  * {
  *   isDefaultAdmin: boolean,
- *   isDefaultInstructor: boolean
+ *   isDefaultInstructor: boolean,
+ *   isDefaultTraining: boolean
  * }
  */
 export async function GET(request: NextRequest) {
@@ -34,13 +35,23 @@ export async function GET(request: NextRequest) {
 
     // 教育者の権限変更パスワードの updated_by を取得
     const instructorPasswordKey = 'role_change_password_hash_instructor';
-    const instructorConfig = db.prepare('SELECT updated_by FROM system_config WHERE key = ?').get(instructorPasswordKey) as { updated_by: string | null } | undefined;
+    const instructorConfig = db
+      .prepare('SELECT updated_by FROM system_config WHERE key = ?')
+      .get(instructorPasswordKey) as { updated_by: string | null } | undefined;
     const isDefaultInstructor = instructorConfig?.updated_by === 'system';
+
+    // 教育訓練の権限変更パスワードの updated_by を取得
+    const trainingPasswordKey = 'role_change_password_hash_training';
+    const trainingConfig = db
+      .prepare('SELECT updated_by FROM system_config WHERE key = ?')
+      .get(trainingPasswordKey) as { updated_by: string | null } | undefined;
+    const isDefaultTraining = trainingConfig?.updated_by === 'system';
 
     return NextResponse.json({
       success: true,
       isDefaultAdmin,
       isDefaultInstructor,
+      isDefaultTraining,
     });
   } catch (err) {
     error(MODULE_NAME, 'デフォルトパスワードチェックエラー:', err);

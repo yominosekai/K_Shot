@@ -11,6 +11,7 @@ import ProfileSkillsSection from './components/ProfileSkillsSection';
 import ProfileCertificationsSection from './components/ProfileCertificationsSection';
 import ProfileMOSSection from './components/ProfileMOSSection';
 import ProfileDetailInfo from './components/ProfileDetailInfo';
+import SkillMappingModal from '@/components/SkillMappingModal';
 
 export default function ProfilePage() {
   const { user, updateUser, isLoading: authLoading } = useAuth();
@@ -19,6 +20,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [isSkillMappingModalOpen, setIsSkillMappingModalOpen] = useState(false);
 
   const {
     formData,
@@ -270,6 +272,16 @@ export default function ProfilePage() {
             {/* 自己紹介と詳細情報 */}
             <ProfileDetailInfo user={user} bio={user.bio} />
 
+            {/* スキルマップボタン */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <button
+                onClick={() => setIsSkillMappingModalOpen(true)}
+                className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+              >
+                スキルマップを表示・編集
+              </button>
+            </div>
+
             {/* スキル・資格セクション */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <ProfileSkillsSection
@@ -298,6 +310,15 @@ export default function ProfilePage() {
               />
             </div>
           </div>
+        )}
+
+        {/* スキルマッピングモーダル */}
+        {user?.id && (
+          <SkillMappingModal
+            isOpen={isSkillMappingModalOpen}
+            onClose={() => setIsSkillMappingModalOpen(false)}
+            userId={user.id}
+          />
         )}
       </div>
     </div>
