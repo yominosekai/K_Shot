@@ -47,6 +47,7 @@ interface MaterialLibraryModalsProps {
   closeMoveFolderModal: () => void;
   moveFolder: FolderNormalized | null;
   handleFolderMove: (folderId: string, targetParentId: string) => Promise<void>;
+  onViewsUpdateRef?: React.MutableRefObject<((materialId: string, views: number) => void) | null>;
 }
 
 export default function MaterialLibraryModals({
@@ -85,6 +86,7 @@ export default function MaterialLibraryModals({
   closeMoveFolderModal,
   moveFolder,
   handleFolderMove,
+  onViewsUpdateRef,
 }: MaterialLibraryModalsProps) {
   return (
     <>
@@ -98,6 +100,11 @@ export default function MaterialLibraryModals({
         onCommentClick={selectedMaterial && onCommentClick ? (materialId) => onCommentClick(selectedMaterial!) : undefined}
         creatorCache={creatorCache}
         onCreatorCacheUpdate={setCreatorCache}
+        onViewsUpdate={(materialId, views) => {
+          if (onViewsUpdateRef?.current) {
+            onViewsUpdateRef.current(materialId, views);
+          }
+        }}
       />
 
       {/* フォルダプロパティモーダル */}

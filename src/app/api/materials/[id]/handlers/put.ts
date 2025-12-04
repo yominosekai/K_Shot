@@ -160,12 +160,14 @@ export async function handlePut(
       now,
     });
 
-    // 更新後の資料を取得
+    // 履歴をmetadata.jsonに追加
+    const metadataPath = path.join(uploadDir, 'metadata.json');
     await addMaterialRevision({
       materialId,
       updatedBy: userId,
       updatedByName: userDisplayName || undefined,
       comment: revisionReason || undefined,
+      metadataPath,
     });
 
     const updatedMaterial = await getMaterialDetail(materialId);

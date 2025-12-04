@@ -1,6 +1,7 @@
-// ゴミ箱移動のプログレスバーモーダルコンポーネント
+// ゴミ箱移動のプログレスバーモーダルコンポーネント（後方互換性のため残す）
+// 内部で汎用のProgressModalを使用
 
-import { Loader2 } from 'lucide-react';
+import ProgressModal from './ProgressModal';
 
 interface TrashProgressModalProps {
   isVisible: boolean;
@@ -13,39 +14,16 @@ export default function TrashProgressModal({
   progress,
   message,
 }: TrashProgressModalProps) {
-  if (!isVisible) {
-    return null;
-  }
+  // メッセージからタイトルを自動判定
+  const title = message.includes('復元') ? '復元中...' : 'ゴミ箱に移動中...';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 min-w-[400px]">
-        <div className="space-y-4">
-          <div className="flex items-center space-x-3">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-            <span className="text-lg font-medium text-gray-900 dark:text-gray-100">
-              {message.includes('復元') ? '復元中...' : 'ゴミ箱に移動中...'}
-            </span>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                {message}
-              </span>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {progress}%
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <ProgressModal
+      isVisible={isVisible}
+      progress={progress}
+      message={message}
+      title={title}
+    />
   );
 }
 

@@ -13,7 +13,6 @@ interface MaterialCardProps {
   onBookmark?: (materialId: string) => void;
   isBookmarked?: boolean;
   onLikesUpdate?: (materialId: string, likes: number) => void;
-  onBookmarksUpdate?: (materialId: string, bookmarks: number) => void;
   onCommentClick?: (materialId: string) => void;
 }
 
@@ -23,7 +22,6 @@ export default function MaterialCard({
   onBookmark,
   isBookmarked = false,
   onLikesUpdate,
-  onBookmarksUpdate,
   onCommentClick,
 }: MaterialCardProps) {
   const { likes, isLiked, isLoading, toggleLike } = useMaterialLikes({
@@ -35,12 +33,6 @@ export default function MaterialCard({
     },
   });
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
-  const [bookmarkCount, setBookmarkCount] = useState(material.bookmark_count ?? 0);
-
-  // お気に入り数が更新されたときに状態を更新
-  useEffect(() => {
-    setBookmarkCount(material.bookmark_count ?? 0);
-  }, [material.bookmark_count]);
 
   // コメント数
   const commentCount = material.comment_count ?? 0;
@@ -53,45 +45,13 @@ export default function MaterialCard({
     }
 
     setIsBookmarkLoading(true);
-    const previousBookmarkCount = bookmarkCount;
-
-    // 楽観的更新
-    const newBookmarkCount = isBookmarked
-      ? Math.max(0, bookmarkCount - 1)
-      : bookmarkCount + 1;
-    setBookmarkCount(newBookmarkCount);
-
     try {
       // onBookmarkは非同期関数なのでawait
       if (onBookmark) {
         await onBookmark(material.id);
       }
-      // お気に入り数を再取得（個別APIで取得）
-      try {
-        const response = await fetch(`/api/materials/${material.id}/bookmarks-count`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            const actualCount = data.count ?? 0;
-            setBookmarkCount(actualCount);
-            onBookmarksUpdate?.(material.id, actualCount);
-          } else {
-            // エラー時は元に戻す
-            setBookmarkCount(previousBookmarkCount);
-          }
-        } else {
-          // エラー時は元に戻す
-          setBookmarkCount(previousBookmarkCount);
-        }
-      } catch (err) {
-        console.error('お気に入り数再取得エラー:', err);
-        // エラー時は元に戻す
-        setBookmarkCount(previousBookmarkCount);
-      }
     } catch (err) {
       console.error('お気に入り更新エラー:', err);
-      // エラー時は元に戻す
-      setBookmarkCount(previousBookmarkCount);
     } finally {
       setIsBookmarkLoading(false);
     }
@@ -234,7 +194,6 @@ export default function MaterialCard({
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               />
-              <span>{bookmarkCount}</span>
             </button>
             {onCommentClick && (
               <button

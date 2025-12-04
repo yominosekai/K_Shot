@@ -11,7 +11,7 @@ interface UseMaterialFormProps {
   categories: CategoryNormalized[];
   initialFolderPath?: string;
   onSuccess: () => void;
-  onError: (message: string) => void;
+  onError: (message: string | Error) => void;
   editMaterial?: MaterialNormalized | null;
   isOpen?: boolean;
   getRevisionReason?: () => string;

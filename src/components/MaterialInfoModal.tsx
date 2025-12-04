@@ -257,15 +257,6 @@ export default function MaterialInfoModal({
                     </label>
                     <p className="text-gray-900 dark:text-gray-100 text-2xl font-semibold">{material.likes}</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center">
-                      <Heart className="w-4 h-4 mr-1" />
-                      お気に入り数
-                    </label>
-                    <p className="text-gray-900 dark:text-gray-100 text-2xl font-semibold">
-                      {material.bookmark_count ?? 0}
-                    </p>
-                  </div>
                 </div>
               </div>
 

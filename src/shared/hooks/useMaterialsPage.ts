@@ -105,7 +105,7 @@ export function useMaterialsPage() {
     refreshMaterials,
     fetchMaterials,
     updateMaterialCommentCount: fetch.updateMaterialCommentCount,
-    updateMaterialBookmarkCount: fetch.updateMaterialBookmarkCount,
+    updateMaterialViews: fetch.updateMaterialViews,
   };
 }
 

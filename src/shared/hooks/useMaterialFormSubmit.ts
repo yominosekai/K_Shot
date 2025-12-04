@@ -137,6 +137,7 @@ export function useMaterialFormSubmit({
 
         // XMLHttpRequestを使用してプログレスバーを実装
         const result = await new Promise<any>((resolve, reject) => {
+          let uploadError: Error | null = null;
           const xhr = new XMLHttpRequest();
 
           // アップロード進捗を監視
@@ -164,7 +165,37 @@ export function useMaterialFormSubmit({
             } else {
               try {
                 const error = JSON.parse(xhr.responseText);
-                reject(new Error(error.error || 'アップロードに失敗しました'));
+                // エラーの詳細情報を含める
+                const errorMessage = error.error || 'アップロードに失敗しました';
+                const errorDetail = error.errorDetail;
+                const errorCode = error.errorCode;
+                
+                // DB_BUSYエラー（SQLITE_BUSYまたはSQLITE_CANTOPEN_ISDIR）の場合は特別なエラーオブジェクトを作成
+                if (errorMessage === 'DB_BUSY' || errorCode === 'SQLITE_BUSY' || errorCode === 'SQLITE_CANTOPEN_ISDIR') {
+                  const errorObj = new Error('DB_BUSY');
+                  (errorObj as any).errorDetail = errorDetail;
+                  (errorObj as any).errorCode = errorCode;
+                  (errorObj as any).errorStack = error.errorStack;
+                  (errorObj as any).isDatabaseBusy = true;
+                  uploadError = errorObj;
+                  reject(errorObj);
+                  return;
+                }
+                
+                let fullErrorMessage = errorMessage;
+                if (errorDetail && process.env.NODE_ENV === 'development') {
+                  fullErrorMessage += ` (詳細: ${errorDetail})`;
+                }
+                if (errorCode) {
+                  fullErrorMessage += ` [コード: ${errorCode}]`;
+                }
+                
+                const errorObj = new Error(fullErrorMessage);
+                (errorObj as any).errorDetail = errorDetail;
+                (errorObj as any).errorCode = errorCode;
+                (errorObj as any).errorStack = error.errorStack;
+                uploadError = errorObj;
+                reject(errorObj);
               } catch {
                 reject(new Error(`アップロードに失敗しました (${xhr.status})`));
               }
@@ -173,12 +204,20 @@ export function useMaterialFormSubmit({
 
           // エラー時
           xhr.addEventListener('error', () => {
-            reject(new Error('ネットワークエラーが発生しました'));
+            const error = new Error('ネットワークエラーが発生しました');
+            if (uploadError) {
+              (error as any).originalError = uploadError;
+            }
+            reject(error);
           });
 
           // 中断時
           xhr.addEventListener('abort', () => {
-            reject(new Error('アップロードが中断されました'));
+            const error = new Error('アップロードが中断されました');
+            if (uploadError) {
+              (error as any).originalError = uploadError;
+            }
+            reject(error);
           });
 
           // リクエスト送信
@@ -217,7 +256,18 @@ export function useMaterialFormSubmit({
         setUploadMessage(isEditMode ? '更新に失敗しました' : 'アップロードに失敗しました');
         // エラーメッセージを少し表示してからalert
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        onError((isEditMode ? '更新エラー: ' : 'アップロードエラー: ') + (error instanceof Error ? error.message : '不明なエラー'));
+        
+        // エラーオブジェクトを構築（DB_BUSYエラーの場合は詳細情報を含める）
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+        if ((errorObj as any).isDatabaseBusy) {
+          // DB_BUSYエラーの場合は、詳細情報を含めたエラーメッセージを渡す
+          const errorDetail = (errorObj as any).errorDetail || errorObj.message;
+          const errorCode = (errorObj as any).errorCode || '';
+          const errorMessage = `DB_BUSY${errorDetail ? `: ${errorDetail}` : ''}${errorCode ? ` [${errorCode}]` : ''}`;
+          onError(errorMessage);
+        } else {
+          onError((isEditMode ? '更新エラー: ' : 'アップロードエラー: ') + errorObj.message);
+        }
       } finally {
         setIsUploading(false);
         setUploadMessage('');

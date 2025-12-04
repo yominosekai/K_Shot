@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ThumbsUp, Heart, Eye, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { ThumbsUp, Eye, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import Image from 'next/image';
 import { useUsers } from '@/contexts/UsersContext';
 
@@ -17,8 +17,8 @@ interface RankingItem {
 }
 
 interface OverviewRankingsSectionProps {
-  rankingType: 'likes' | 'bookmarks' | 'views';
-  onRankingTypeChange: (type: 'likes' | 'bookmarks' | 'views') => void;
+  rankingType: 'likes' | 'views';
+  onRankingTypeChange: (type: 'likes' | 'views') => void;
   rankings: RankingItem[];
   loading: boolean;
   cached?: boolean;
@@ -92,19 +92,6 @@ export default function OverviewRankingsSection({
           <div className="flex items-center space-x-2">
             <ThumbsUp className="w-4 h-4" />
             <span>いいね</span>
-          </div>
-        </button>
-        <button
-          onClick={() => onRankingTypeChange('bookmarks')}
-          className={`px-4 py-2 text-sm font-medium transition-colors ${
-            rankingType === 'bookmarks'
-              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-          }`}
-        >
-          <div className="flex items-center space-x-2">
-            <Heart className="w-4 h-4" />
-            <span>お気に入り</span>
           </div>
         </button>
         <button
@@ -199,7 +186,7 @@ export default function OverviewRankingsSection({
                   {item.count}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
-                  {rankingType === 'likes' ? 'いいね' : rankingType === 'bookmarks' ? 'お気に入り' : '閲覧'}
+                  {rankingType === 'likes' ? 'いいね' : '閲覧'}
                 </span>
               </div>
             </div>

@@ -2,7 +2,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/shared/lib/database/db';
-import { getBookmarkCounts } from '@/shared/lib/data-access/bookmarks';
 import { debug, info } from '@/shared/lib/logger';
 
 const MODULE_NAME = 'api/analytics/rankings';
@@ -26,12 +25,12 @@ interface RankingItem {
 
 /**
  * GET /api/analytics/rankings
- * 資料ランキングを取得（いいね、お気に入り、閲覧数）
+ * 資料ランキングを取得（いいね、閲覧数）
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type') || 'likes'; // likes, bookmarks, views
+    const type = searchParams.get('type') || 'likes'; // likes, views
     const limit = parseInt(searchParams.get('limit') || '10', 10);
     const forceRefresh = searchParams.get('force_refresh') === 'true'; // キャッシュを無効化して強制更新
 
@@ -119,75 +118,6 @@ export async function GET(request: NextRequest) {
             title: result.title,
             count: result.count,
             createdBy: result.created_by,
-          });
-        }
-      }
-    } else if (type === 'bookmarks') {
-      // お気に入り数ランキング（全ユーザーのbookmarks.jsonから集計）
-      // まず全資料を取得
-      const allMaterials = db
-        .prepare('SELECT id, title, created_by FROM materials WHERE is_published = 1')
-        .all() as Array<{ id: string; title: string; created_by: string }>;
-
-      const materialIds = allMaterials.map((m) => m.id);
-      const bookmarkCounts = await getBookmarkCounts(materialIds);
-
-      // ランキングを作成
-      const rankingData = allMaterials.map((material) => ({
-        materialId: material.id,
-        title: material.title,
-        createdBy: material.created_by,
-        count: bookmarkCounts.get(material.id) || 0,
-      }));
-
-      // カウントでソートして上位を取得
-      rankingData.sort((a, b) => {
-        if (b.count !== a.count) {
-          return b.count - a.count;
-        }
-        return 0;
-      });
-
-      const topRankings = rankingData.slice(0, limit);
-
-      // 作成者情報を一括取得
-      const creatorIds = [...new Set(topRankings.map(r => r.createdBy))];
-      if (creatorIds.length > 0) {
-        const placeholders = creatorIds.map(() => '?').join(',');
-        const creators = db.prepare(`
-          SELECT id, display_name, avatar FROM users 
-          WHERE id IN (${placeholders})
-        `).all(...creatorIds) as Array<{
-          id: string;
-          display_name: string;
-          avatar: string | null;
-        }>;
-
-        const creatorMap = new Map(
-          creators.map(c => [c.id, c])
-        );
-
-        debug(MODULE_NAME, `作成者情報一括取得完了: ${topRankings.length}件中${creatorIds.length}人の作成者`);
-
-        for (const item of topRankings) {
-          const creator = creatorMap.get(item.createdBy);
-          rankings.push({
-            materialId: item.materialId,
-            title: item.title,
-            count: item.count,
-            createdBy: item.createdBy,
-            createdByName: creator?.display_name,
-            createdByAvatar: creator?.avatar || undefined,
-          });
-        }
-      } else {
-        // 作成者がいない場合（通常は発生しない）
-        for (const item of topRankings) {
-          rankings.push({
-            materialId: item.materialId,
-            title: item.title,
-            count: item.count,
-            createdBy: item.createdBy,
           });
         }
       }

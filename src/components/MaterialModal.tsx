@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Heart, ThumbsUp, MessageCircle } from 'lucide-react';
 import { useMaterialLikes } from '@/shared/hooks/useMaterialLikes';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,6 +25,7 @@ interface MaterialModalProps {
   onCommentClick?: (materialId: string) => void;
   creatorCache?: Map<string, User>; // 作成者情報のキャッシュ
   onCreatorCacheUpdate?: (cache: Map<string, User>) => void; // キャッシュ更新コールバック
+  onViewsUpdate?: (materialId: string, views: number) => void; // 閲覧数更新コールバック
 }
 
 export default function MaterialModal({
@@ -36,6 +37,7 @@ export default function MaterialModal({
   onCommentClick,
   creatorCache,
   onCreatorCacheUpdate,
+  onViewsUpdate,
 }: MaterialModalProps) {
   const { user } = useAuth();
   const [localCreator, setLocalCreator] = useState<User | null>(null);
@@ -44,6 +46,8 @@ export default function MaterialModal({
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const { users: userCache, getUsers } = useUsers();
+  const onViewsUpdateRef = useRef(onViewsUpdate);
+  const viewsUpdateExecutedRef = useRef<string | null>(null);
 
   // いいね機能
   const { likes, isLiked, isLoading, toggleLike } = useMaterialLikes({
@@ -72,17 +76,59 @@ export default function MaterialModal({
     },
   });
 
+  // onViewsUpdateの参照を更新
+  useEffect(() => {
+    onViewsUpdateRef.current = onViewsUpdate;
+  }, [onViewsUpdate]);
+
   // materialが更新されたらlocalMaterialも更新
   useEffect(() => {
     setLocalMaterial(material);
+    // materialが変更されたら、閲覧数更新の実行済みフラグをリセット
+    viewsUpdateExecutedRef.current = null;
   }, [material]);
 
-  // モーダルが開かれた時に閲覧履歴に記録
+  // モーダルが開かれた時に閲覧履歴に記録し、閲覧数を更新
   useEffect(() => {
-    if (isOpen && material) {
+    if (isOpen && material?.id && user?.id) {
+      // 同じ資料IDで既に実行済みの場合はスキップ
+      if (viewsUpdateExecutedRef.current === material.id) {
+        return;
+      }
+      
+      // 実行済みフラグを設定
+      viewsUpdateExecutedRef.current = material.id;
+      
+      // localStorageに閲覧履歴を記録
       addMaterialView(material.id, material.title);
+      
+      // APIを呼び出して閲覧数を更新
+      const updateViews = async () => {
+        try {
+          const response = await fetch(`/api/materials/${material.id}?user_id=${user.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.material) {
+              const newViews = data.material.views ?? material.views ?? 0;
+              // ローカルのmaterialを更新
+              setLocalMaterial((prev) => {
+                if (prev && prev.id === material.id) {
+                  return { ...prev, views: newViews };
+                }
+                return prev;
+              });
+              // 親コンポーネントに通知
+              onViewsUpdateRef.current?.(material.id, newViews);
+            }
+          }
+        } catch (err) {
+          console.error('閲覧数更新エラー:', err);
+        }
+      };
+      
+      updateViews();
     }
-  }, [isOpen, material]);
+  }, [isOpen, material?.id, user?.id]);
 
   // 更新履歴を取得
   useEffect(() => {

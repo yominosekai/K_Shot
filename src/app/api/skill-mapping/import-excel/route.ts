@@ -246,12 +246,14 @@ export async function POST(request: NextRequest) {
 
       // displayOrderを数値に変換
       let displayOrder: number | undefined = undefined;
-      if (row.displayOrder !== undefined && row.displayOrder !== '') {
-        const parsed = typeof row.displayOrder === 'number' 
-          ? row.displayOrder 
-          : parseInt(String(row.displayOrder), 10);
-        if (!isNaN(parsed)) {
-          displayOrder = parsed;
+      if (row.displayOrder !== undefined) {
+        if (typeof row.displayOrder === 'string' && row.displayOrder !== '') {
+          const parsed = parseInt(row.displayOrder, 10);
+          if (!isNaN(parsed)) {
+            displayOrder = parsed;
+          }
+        } else if (typeof row.displayOrder === 'number') {
+          displayOrder = row.displayOrder;
         }
       }
 

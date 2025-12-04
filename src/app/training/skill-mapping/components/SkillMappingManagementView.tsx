@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import FullscreenToggleButton from '@/components/FullscreenToggleButton';
+import { useConfirmDialog } from '@/contexts/ConfirmDialogContext';
 import type { SkillPhaseItem as BaseSkillPhaseItem } from '@/shared/lib/data-access/skill-mapping';
 import type { SkillPhaseItem, NewRow } from './types';
 import ExcelViewModeTable from './ExcelViewModeTable';
@@ -19,6 +20,7 @@ interface SkillMappingManagementViewProps {}
 type TabType = 'view' | 'edit';
 
 export default function SkillMappingManagementView({}: SkillMappingManagementViewProps) {
+  const confirmDialog = useConfirmDialog();
   const [items, setItems] = useState<BaseSkillPhaseItem[]>([]);
   const [editItems, setEditItems] = useState<SkillPhaseItem[]>([]);
   const [newRows, setNewRows] = useState<NewRow[]>([]);
@@ -103,7 +105,7 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
   };
 
   // チェックボタンのハンドラ
-  const handleCheck = () => {
+  const handleCheck = async () => {
     const currentData = editItems.length > 0 ? editItems : [];
     
     // バリデーション実行
@@ -137,22 +139,40 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
     
     if (result.errors.length === 0) {
       if (!hasNewItems && !hasSimilarItems) {
-        alert('✓ チェック完了：エラーはありません。保存してDB同期できます。');
+        await confirmDialog({
+          title: 'チェック完了',
+          message: '✓ エラーはありません。保存してDB同期できます。',
+          variant: 'info',
+          confirmText: 'OK',
+          hideCancel: true,
+        });
       }
     } else {
-      alert(`✗ チェック結果：${result.errors.length}件のエラーが見つかりました。エラーを修正してください。`);
+      await confirmDialog({
+        title: 'チェック結果',
+        message: `✗ ${result.errors.length}件のエラーが見つかりました。エラーを修正してください。`,
+        variant: 'danger',
+        confirmText: 'OK',
+        hideCancel: true,
+      });
     }
   };
 
   // 保存ボタンのハンドラ
-  const handleSave = () => {
+  const handleSave = async () => {
     const currentData = editItems.length > 0 ? editItems : [];
     const result = validateData(currentData, newRows);
     
     if (result.errors.length > 0) {
       setValidationErrors(result.errors);
       setErrorRowIds(result.errorRowIds);
-      alert(`✗ 保存できません：${result.errors.length}件のエラーがあります。先に「チェック」ボタンでエラーを確認してください。`);
+      await confirmDialog({
+        title: '保存できません',
+        message: `✗ ${result.errors.length}件のエラーがあります。先に「チェック」ボタンでエラーを確認してください。`,
+        variant: 'danger',
+        confirmText: 'OK',
+        hideCancel: true,
+      });
       return;
     }
     
@@ -224,14 +244,32 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
         setRowOrder([]); // 行の順序をリセット
         setValidationErrors([]);
         setErrorRowIds(new Set());
-        alert('データベースに同期しました');
+        await confirmDialog({
+          title: '同期完了',
+          message: 'データベースに同期しました',
+          variant: 'info',
+          confirmText: 'OK',
+          hideCancel: true,
+        });
       } else {
-        alert(`同期に失敗しました: ${result.error || '不明なエラー'}`);
+        await confirmDialog({
+          title: '同期失敗',
+          message: `同期に失敗しました: ${result.error || '不明なエラー'}`,
+          variant: 'danger',
+          confirmText: 'OK',
+          hideCancel: true,
+        });
         setIsSaving(false);
       }
     } catch (error) {
       console.error('同期エラー:', error);
-      alert('同期に失敗しました');
+      await confirmDialog({
+        title: '同期失敗',
+        message: '同期に失敗しました',
+        variant: 'danger',
+        confirmText: 'OK',
+        hideCancel: true,
+      });
       setIsSaving(false);
     }
   };
@@ -273,7 +311,13 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
           await writable.write(blob);
           await writable.close();
 
-          alert('Excelファイルをエクスポートしました');
+          await confirmDialog({
+            title: 'エクスポート完了',
+            message: 'Excelファイルをエクスポートしました',
+            variant: 'info',
+            confirmText: 'OK',
+            hideCancel: true,
+          });
           return;
         } catch (saveError: any) {
           // ユーザーがキャンセルした場合はエラーを無視
@@ -295,10 +339,22 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
 
-      alert('Excelファイルをエクスポートしました');
+      await confirmDialog({
+        title: 'エクスポート完了',
+        message: 'Excelファイルをエクスポートしました',
+        variant: 'info',
+        confirmText: 'OK',
+        hideCancel: true,
+      });
     } catch (error) {
       console.error('エクスポートエラー:', error);
-      alert('エクスポートに失敗しました');
+      await confirmDialog({
+        title: 'エクスポート失敗',
+        message: 'エクスポートに失敗しました',
+        variant: 'danger',
+        confirmText: 'OK',
+        hideCancel: true,
+      });
     }
   };
 
@@ -313,7 +369,13 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
 
       // ファイルサイズチェック（10MB制限）
       if (file.size > 10 * 1024 * 1024) {
-        alert('ファイルサイズが大きすぎます。10MB以下のファイルを選択してください。');
+        await confirmDialog({
+          title: 'ファイルサイズエラー',
+          message: 'ファイルサイズが大きすぎます。10MB以下のファイルを選択してください。',
+          variant: 'danger',
+          confirmText: 'OK',
+          hideCancel: true,
+        });
         return;
       }
 
@@ -337,7 +399,13 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
           // HTMLエラーページが返された場合
           const text = await response.text();
           console.error('非JSONレスポンス:', text.substring(0, 200));
-          alert(`エラー: サーバーエラーが発生しました。APIエンドポイントが正しく実装されているか確認してください。`);
+          await confirmDialog({
+            title: 'サーバーエラー',
+            message: 'サーバーエラーが発生しました。APIエンドポイントが正しく実装されているか確認してください。',
+            variant: 'danger',
+            confirmText: 'OK',
+            hideCancel: true,
+          });
           return;
         }
 
@@ -346,9 +414,21 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
         if (!response.ok) {
           if (result.details && Array.isArray(result.details)) {
             const errorMessage = `プレビューエラー：${result.error}\n\nエラー詳細：\n${result.details.slice(0, 10).join('\n')}${result.details.length > 10 ? `\n...他${result.details.length - 10}件のエラー` : ''}`;
-            alert(errorMessage);
+            await confirmDialog({
+              title: 'プレビューエラー',
+              message: errorMessage,
+              variant: 'danger',
+              confirmText: 'OK',
+              hideCancel: true,
+            });
           } else {
-            alert(`プレビューエラー：${result.error || '不明なエラーが発生しました'}`);
+            await confirmDialog({
+              title: 'プレビューエラー',
+              message: result.error || '不明なエラーが発生しました',
+              variant: 'danger',
+              confirmText: 'OK',
+              hideCancel: true,
+            });
           }
           return;
         }
@@ -363,7 +443,13 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
         setShowImportPreviewModal(true);
       } catch (error) {
         console.error('プレビューエラー:', error);
-        alert('プレビュー中にエラーが発生しました。');
+        await confirmDialog({
+          title: 'プレビューエラー',
+          message: 'プレビュー中にエラーが発生しました。',
+          variant: 'danger',
+          confirmText: 'OK',
+          hideCancel: true,
+        });
       }
     };
     input.click();
@@ -389,26 +475,56 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
       if (!response.ok) {
         if (result.details && Array.isArray(result.details)) {
           const errorMessage = `インポートエラー：${result.error}\n\nエラー詳細：\n${result.details.slice(0, 10).join('\n')}${result.details.length > 10 ? `\n...他${result.details.length - 10}件のエラー` : ''}`;
-          alert(errorMessage);
+          await confirmDialog({
+            title: 'インポートエラー',
+            message: errorMessage,
+            variant: 'danger',
+            confirmText: 'OK',
+            hideCancel: true,
+          });
         } else {
-          alert(`インポートエラー：${result.error || '不明なエラーが発生しました'}`);
+          await confirmDialog({
+            title: 'インポートエラー',
+            message: result.error || '不明なエラーが発生しました',
+            variant: 'danger',
+            confirmText: 'OK',
+            hideCancel: true,
+          });
         }
         return;
       }
 
       if (result.success) {
-        alert(result.message || `${result.importedCount || 0}件のデータをインポートしました`);
+        await confirmDialog({
+          title: 'インポート完了',
+          message: result.message || `${result.importedCount || 0}件のデータをインポートしました`,
+          variant: 'info',
+          confirmText: 'OK',
+          hideCancel: true,
+        });
         setShowImportPreviewModal(false);
         setImportPreviewData(null);
         setImportFile(null);
         // データを再取得
         await fetchItems();
       } else {
-        alert(`インポートエラー：${result.error || '不明なエラーが発生しました'}`);
+        await confirmDialog({
+          title: 'インポートエラー',
+          message: result.error || '不明なエラーが発生しました',
+          variant: 'danger',
+          confirmText: 'OK',
+          hideCancel: true,
+        });
       }
     } catch (error) {
       console.error('インポート実行エラー:', error);
-      alert('インポート実行中にエラーが発生しました。');
+      await confirmDialog({
+        title: 'インポートエラー',
+        message: 'インポート実行中にエラーが発生しました。',
+        variant: 'danger',
+        confirmText: 'OK',
+        hideCancel: true,
+      });
     } finally {
       setIsImporting(false);
     }

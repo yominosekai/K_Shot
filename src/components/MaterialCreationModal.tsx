@@ -39,6 +39,7 @@ export default function MaterialCreationModal({
   const revisionConfirmedRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const revisionReasonRef = useRef('');
+  const [errorModalMessage, setErrorModalMessage] = useState<string | null>(null);
 
   const updateRevisionReason = (value: string) => {
     setRevisionReason(value);
@@ -92,7 +93,16 @@ export default function MaterialCreationModal({
       onClose();
     },
     onError: (message) => {
-      alert(message);
+      // DB_BUSYエラー（SQLITE_BUSYまたはSQLITE_CANTOPEN_ISDIR）の場合は特別なメッセージを表示
+      if (message instanceof Error && (message as any).isDatabaseBusy) {
+        setErrorModalMessage(message.message || String(message));
+      } else if (typeof message === 'string' && message.includes('DB_BUSY')) {
+        setErrorModalMessage(message);
+      } else if (message instanceof Error) {
+        setErrorModalMessage(message.message || String(message));
+      } else {
+        setErrorModalMessage(message);
+      }
     },
     getRevisionReason: () => revisionReasonRef.current,
   });
@@ -119,7 +129,9 @@ export default function MaterialCreationModal({
 
   // モーダルが開かれたときにフォームをリセット（編集モードの場合は既存データを保持）
   useEffect(() => {
-    if (isOpen && !isEditMode) {
+    if (!isOpen) {
+      setErrorModalMessage(null);
+    } else if (isOpen && !isEditMode) {
       resetForm();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -303,6 +315,48 @@ export default function MaterialCreationModal({
                 disabled={isUploading}
               >
                 この内容で更新
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* エラーモーダル */}
+      {errorModalMessage && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">エラー</h3>
+              {typeof errorModalMessage === 'string' && errorModalMessage.includes('DB_BUSY') ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                    アップロードエラー: アップロードに失敗しました。{'\n'}DB_BUSYの為、時間を空けて再度作成ボタンを押してください。
+                  </p>
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">エラーログ:</p>
+                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 text-xs font-mono text-gray-700 dark:text-gray-300 overflow-x-auto">
+                      {errorModalMessage && (
+                        <div className="mb-2">
+                          <span className="font-semibold">詳細: </span>
+                          {errorModalMessage}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">
+                  {errorModalMessage}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setErrorModalMessage(null)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                閉じる
               </button>
             </div>
           </div>

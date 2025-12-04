@@ -24,7 +24,6 @@ interface MaterialBrowserContentProps {
   onBookmark?: (materialId: string) => void;
   onCommentClick?: (material: MaterialNormalized) => void;
   onLikesUpdate?: (materialId: string, likes: number) => void;
-  onBookmarksUpdate?: (materialId: string, bookmarks: number) => void;
   onContextMenu: (e: React.MouseEvent, folder?: FolderNormalized, material?: MaterialNormalized) => void;
   formatDate: (dateString: string) => string;
 }
@@ -43,7 +42,6 @@ export default function MaterialBrowserContent({
   onBookmark,
   onCommentClick,
   onLikesUpdate,
-  onBookmarksUpdate,
   onContextMenu,
   formatDate,
 }: MaterialBrowserContentProps) {
@@ -113,7 +111,6 @@ export default function MaterialBrowserContent({
               bookmarkedIds={bookmarkedIds}
               onCommentClick={onCommentClick}
               onLikesUpdate={onLikesUpdate}
-              onBookmarksUpdate={onBookmarksUpdate}
               onContextMenu={(e, material) => onContextMenu(e, undefined, material)}
             />
           )}

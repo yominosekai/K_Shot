@@ -34,10 +34,9 @@ interface MaterialLibraryBrowserProps {
   refreshTrigger?: number;
   onPathChange?: (path: string) => void;
   onLikesUpdate?: (materialId: string, likes: number) => void;
-  onBookmarksUpdate?: (materialId: string, bookmarks: number) => void;
   onCommentClick?: (material: MaterialNormalized) => void;
   onCommentCountUpdateRef?: React.MutableRefObject<((materialId: string) => void) | null>;
-  onBookmarkCountUpdateRef?: React.MutableRefObject<((materialId: string, bookmarkCount: number) => void) | null>;
+  onViewsUpdateRef?: React.MutableRefObject<((materialId: string, views: number) => void) | null>;
 }
 
 export default function MaterialLibraryBrowser({
@@ -52,9 +51,8 @@ export default function MaterialLibraryBrowser({
   refreshTrigger = 0,
   onPathChange,
   onCommentClick,
-  onBookmarksUpdate,
   onCommentCountUpdateRef,
-  onBookmarkCountUpdateRef,
+  onViewsUpdateRef,
 }: MaterialLibraryBrowserProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: any[] } | null>(null);
   const { categories } = useCategories(); // Contextから取得
@@ -77,7 +75,7 @@ export default function MaterialLibraryBrowser({
     handleFolderClick,
     handleBreadcrumbClick,
     updateMaterialCommentCount,
-    updateMaterialBookmarkCount,
+    updateMaterialViews,
   } = useFolderNavigation({
     refreshTrigger,
     onPathChange,
@@ -91,12 +89,13 @@ export default function MaterialLibraryBrowser({
     }
   }, [onCommentCountUpdateRef, updateMaterialCommentCount]);
 
-  // 親から呼び出せるように、updateMaterialBookmarkCountをrefに公開
+  // 親から呼び出せるように、updateMaterialViewsをrefに公開
   useEffect(() => {
-    if (onBookmarkCountUpdateRef) {
-      onBookmarkCountUpdateRef.current = updateMaterialBookmarkCount;
+    if (onViewsUpdateRef) {
+      onViewsUpdateRef.current = updateMaterialViews;
     }
-  }, [onBookmarkCountUpdateRef, updateMaterialBookmarkCount]);
+  }, [onViewsUpdateRef, updateMaterialViews]);
+
 
   // パス管理
   const { buildRelativePath, copyPath } = useMaterialPathManager();
@@ -196,7 +195,6 @@ export default function MaterialLibraryBrowser({
         onBookmark={onBookmark}
         onCommentClick={onCommentClick}
         onLikesUpdate={onLikesUpdate}
-        onBookmarksUpdate={onBookmarksUpdate}
         onContextMenu={handleContextMenu}
         formatDate={formatDate}
       />
@@ -248,6 +246,7 @@ export default function MaterialLibraryBrowser({
         closeMoveFolderModal={modals.closeMoveFolderModal}
         moveFolder={modals.moveFolder}
         handleFolderMove={modals.handleFolderMove}
+        onViewsUpdateRef={onViewsUpdateRef}
       />
 
       {/* トースト通知 */}

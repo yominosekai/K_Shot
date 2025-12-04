@@ -70,10 +70,6 @@ export async function GET(request: NextRequest) {
       filter.since = searchParams.get('since') || undefined;
     }
 
-    // お気に入り数を含めるかどうか
-    if (searchParams.get('include_bookmark_counts') === 'true') {
-      filter.include_bookmark_counts = true;
-    }
 
     // いいね状態を取得するためにuser_idを追加
     if (authResult.user?.id) {

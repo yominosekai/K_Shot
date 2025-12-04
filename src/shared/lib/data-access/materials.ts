@@ -7,7 +7,6 @@ import path from 'path';
 import fs from 'fs/promises';
 import type { MaterialNormalized, MaterialMetadata, CategoryNormalized, MaterialFilter } from '@/features/materials/types';
 import { debug, info, error } from '../logger';
-import { getBookmarkCounts } from './bookmarks';
 import { getLikeStatuses } from './likes';
 
 const MODULE_NAME = 'materials';
@@ -170,23 +169,6 @@ export async function getMaterials(filter?: MaterialFilter): Promise<MaterialNor
       likes: row.likes || 0,
     }));
 
-    // お気に入り数を一括取得（include_bookmark_countsがtrueの場合）
-    if (filter?.include_bookmark_counts && normalized.length > 0) {
-      try {
-        const materialIds = normalized.map(m => m.id);
-        const bookmarkCounts = await getBookmarkCounts(materialIds);
-        
-        // お気に入り数を追加
-        normalized.forEach(material => {
-          material.bookmark_count = bookmarkCounts.get(material.id) || 0;
-        });
-        
-        debug(MODULE_NAME, `お気に入り数一括取得完了: ${normalized.length}件`);
-      } catch (err) {
-        error(MODULE_NAME, 'お気に入り数一括取得エラー:', err);
-        // エラーが発生しても続行（お気に入り数は0のまま）
-      }
-    }
 
     // いいね状態を一括取得（user_idが指定されている場合）
     if (normalized.length > 0 && filter?.user_id) {

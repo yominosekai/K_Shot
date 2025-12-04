@@ -18,6 +18,11 @@ const MODULE_NAME = 'api/materials/upload';
  * 共有資料をアップロード
  */
 export async function POST(request: NextRequest) {
+  // エラーハンドリングで使用する変数をスコープ外で定義
+  let folderPath = '';
+  let materialId = '';
+  let userId = '';
+  
   try {
     const formData = await request.formData();
 
@@ -30,8 +35,8 @@ export async function POST(request: NextRequest) {
     const estimated_hours = formData.get('estimated_hours') as string;
     const tags = formData.get('tags') as string;
     const content = formData.get('content') as string; // document.mdの内容
-    const userId = formData.get('user_id') as string; // 作成者のユーザーID
-    const folderPath = (formData.get('folder_path') as string) || ''; // フォルダパス
+    userId = formData.get('user_id') as string; // 作成者のユーザーID
+    folderPath = (formData.get('folder_path') as string) || ''; // フォルダパス
     const userDisplayName = (formData.get('user_display_name') as string) || '';
 
     // バリデーション
@@ -50,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 新しい資料IDを生成
-    const materialId = Date.now().toString();
+    materialId = Date.now().toString();
     const directoryName = `material_${materialId}`;
 
     // 保存先パス（フォルダパスに基づいて構築）
@@ -68,23 +73,28 @@ export async function POST(request: NextRequest) {
       materialDir = path.join('shared', 'shared_materials', 'uncategorized', directoryName);
     }
 
-    // 常にネットワークドライブに保存
-    const uploadDir = path.join(drivePath, materialDir);
+    // UUIDを生成
+    const uuid = uuidv4();
+    const now = new Date().toISOString();
 
-    // 保存先ディレクトリを作成
-    await mkdir(uploadDir, { recursive: true });
-    debug(MODULE_NAME, `ディレクトリ作成: ${uploadDir}`);
-
-    // attachmentsディレクトリを作成
-    const attachmentsDir = path.join(uploadDir, 'attachments');
-    await mkdir(attachmentsDir, { recursive: true });
-
-    // アップロードされたファイルを処理
+    // アップロードされたファイルを処理（メタデータ用に先に処理）
     const files = formData.getAll('files') as File[];
     const relativePathsJson = formData.get('relativePaths') as string | null;
     const relativePathMap: Record<string, string> = relativePathsJson
       ? JSON.parse(relativePathsJson)
       : {};
+
+    // ファイル名を安全にする（Windowsで使用できない文字のみを置き換え、2バイト文字は保持）
+    const sanitizeFileName = (fileName: string): string => {
+      return fileName
+        .replace(/[<>:"|?*\\\/]/g, '_') // Windowsで使用できない文字を置き換え
+        .replace(/[\x00-\x1F]/g, '_') // 制御文字を置き換え
+        .replace(/^\.+/, '') // 先頭のピリオドを削除
+        .replace(/\.+$/, '') // 末尾のピリオドを削除
+        .replace(/^ +| +$/g, '') // 先頭・末尾のスペースを削除
+        .replace(/\.\.+/g, '.') // 連続するピリオドを1つに
+        .trim(); // トリム
+    };
 
     const attachmentList: Array<{
       filename: string;
@@ -94,34 +104,162 @@ export async function POST(request: NextRequest) {
       relativePath?: string;
     }> = [];
 
+    // ファイル情報を先に収集（メタデータ用）
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      // 0バイトファイルもアップロード可能にする
-        // relativePathを取得（元のファイル名をキーとして使用）
+      const relativePath = relativePathMap[file.name] || undefined;
+      
+      let safeFileName = sanitizeFileName(file.name);
+      if (!safeFileName || safeFileName.length === 0) {
+        const ext = path.extname(file.name) || '';
+        safeFileName = `file_${i + 1}${ext}`;
+      }
+
+      let safeRelativePath: string | undefined = undefined;
+      if (relativePath) {
+        const pathParts = relativePath.split('/').map(part => sanitizeFileName(part));
+        safeRelativePath = pathParts.join('/');
+      }
+
+      attachmentList.push({
+        filename: safeRelativePath ? safeRelativePath.split('/').pop() || safeFileName : safeFileName,
+        original_filename: file.name,
+        size: file.size,
+        type: file.type,
+        relativePath: safeRelativePath,
+      });
+    }
+
+    // メタデータを作成
+    const metadata = {
+      id: materialId,
+      uuid: uuid,
+      title,
+      description,
+      category_id,
+      type: type as 'document' | 'presentation' | 'video' | 'link' | 'other',
+      difficulty: difficulty || undefined,
+      estimated_hours: estimated_hours ? parseFloat(estimated_hours) : undefined,
+      tags: tags ? tags.split(',').map((tag) => tag.trim()).filter((tag) => tag) : [],
+      folder_path: folderPath,
+      created_by: userId,
+      created_date: now,
+      updated_date: now,
+      is_published: true,
+      views: 0,
+      likes: 0,
+      attachments: attachmentList,
+    };
+
+    // 【重要】先にデータベースに保存（成功を確認してからファイルシステムに保存）
+    const db = getDatabase();
+    
+    // 資料INSERT用の準備
+    const insertMaterial = db.prepare(`
+      INSERT INTO materials (
+        id, uuid, title, description, category_id, type, difficulty, estimated_hours,
+        tags, folder_path, created_by, created_date, updated_date,
+        is_published, views, likes
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    const materialParams = [
+      materialId,
+      uuid,
+      title,
+      description || null,
+      category_id || null,
+      type,
+      difficulty || null,
+      estimated_hours ? parseFloat(estimated_hours) : null,
+      tags || '',
+      folderPath || '',
+      userId,
+      now,
+      now,
+      1, // is_published
+      0, // views
+      0  // likes
+    ];
+    
+    // リトライ処理（最大5回、指数バックオフ）
+    const maxRetries = 5;
+    let retryCount = 0;
+    let lastError: any = null;
+    let dbSaveSuccess = false;
+    
+    while (retryCount < maxRetries) {
+      try {
+        insertMaterial.run(...materialParams);
+        dbSaveSuccess = true;
+        if (retryCount > 0) {
+          debug(
+            MODULE_NAME,
+            `SQLiteに資料を追加成功（リトライ ${retryCount}回後）: materialId=${materialId}`
+          );
+          // SQLITE_BUSYが発生したが最終的に成功した場合のログ
+          await logBusyError(userId, 'uploadMaterial', retryCount, true, { materialId, title });
+        } else {
+          debug(MODULE_NAME, `SQLiteに資料を追加成功: materialId=${materialId}`);
+        }
+        break; // 成功したらループを抜ける
+      } catch (err: any) {
+        lastError = err;
+        // SQLITE_BUSYエラーまたはSQLITE_CANTOPEN_ISDIRエラーの場合のみリトライ
+        if ((err.code === 'SQLITE_BUSY' || err.code === 'SQLITE_CANTOPEN_ISDIR') && retryCount < maxRetries - 1) {
+          retryCount++;
+          const waitTime = 50 * retryCount; // 50ms, 100ms, 150ms, 200ms
+          debug(MODULE_NAME, `SQLite書き込み競合検出（リトライ ${retryCount}回目）: materialId=${materialId}, ${waitTime}ms待機`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+        // それ以外のエラーまたは最大リトライ回数に達した場合はエラーを投げる
+        throw err;
+      }
+    }
+    
+    if (retryCount >= maxRetries && lastError) {
+      error(
+        MODULE_NAME,
+        `SQLite書き込み失敗（最大リトライ回数に達しました）: materialId=${materialId}`,
+        lastError
+      );
+      // SQLITE_BUSYが発生して最終的に失敗した場合のログ
+      await logBusyError(userId, 'uploadMaterial', retryCount, false, { materialId, title });
+      throw lastError;
+    }
+
+    // データベースへの保存が成功したことを確認
+    if (!dbSaveSuccess) {
+      throw new Error('データベースへの保存に失敗しました');
+    }
+
+    // データベースへの保存が成功したので、ファイルシステムに保存
+    try {
+      // 常にネットワークドライブに保存
+      const uploadDir = path.join(drivePath, materialDir);
+
+      // 保存先ディレクトリを作成
+      await mkdir(uploadDir, { recursive: true });
+      debug(MODULE_NAME, `ディレクトリ作成: ${uploadDir}`);
+
+      // attachmentsディレクトリを作成
+      const attachmentsDir = path.join(uploadDir, 'attachments');
+      await mkdir(attachmentsDir, { recursive: true });
+
+      // ファイルを保存
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const attachment = attachmentList[i];
         const relativePath = relativePathMap[file.name] || undefined;
 
-        // ファイル名を安全にする（Windowsで使用できない文字のみを置き換え、2バイト文字は保持）
-        // Windowsで使用できない文字: < > : " | ? * \ / および制御文字
-        const sanitizeFileName = (fileName: string): string => {
-          return fileName
-            .replace(/[<>:"|?*\\\/]/g, '_') // Windowsで使用できない文字を置き換え
-            .replace(/[\x00-\x1F]/g, '_') // 制御文字を置き換え
-            .replace(/^\.+/, '') // 先頭のピリオドを削除
-            .replace(/\.+$/, '') // 末尾のピリオドを削除
-            .replace(/^ +| +$/g, '') // 先頭・末尾のスペースを削除
-            .replace(/\.\.+/g, '.') // 連続するピリオドを1つに
-            .trim(); // トリム
-        };
-
         let safeFileName = sanitizeFileName(file.name);
-        
-        // 空になった場合はデフォルト名を使用
         if (!safeFileName || safeFileName.length === 0) {
           const ext = path.extname(file.name) || '';
           safeFileName = `file_${i + 1}${ext}`;
         }
 
-        // relativePathがある場合、パスも安全化
         let safeRelativePath: string | undefined = undefined;
         if (relativePath) {
           const pathParts = relativePath.split('/').map(part => sanitizeFileName(part));
@@ -160,134 +298,43 @@ export async function POST(request: NextRequest) {
 
         await writeFile(filePath, buffer);
         debug(MODULE_NAME, `ファイル保存: ${filePath} (元のファイル名: ${file.name}, relativePath: ${savedRelativePath || 'なし'})`);
-
-        attachmentList.push({
-          filename: safeRelativePath ? safeRelativePath.split('/').pop() || safeFileName : safeFileName,
-          original_filename: file.name, // 元のファイル名も保存
-          size: file.size,
-          type: file.type,
-          relativePath: savedRelativePath, // フォルダ構造を保持
-        });
-    }
-
-    // document.mdを作成
-    if (content && content.trim()) {
-      const documentPath = path.join(uploadDir, 'document.md');
-      await writeFile(documentPath, content, 'utf-8');
-      debug(MODULE_NAME, `document.md作成: ${documentPath}`);
-    }
-
-    // UUIDを生成
-    const uuid = uuidv4();
-    const now = new Date().toISOString();
-
-    // メタデータを作成
-    const metadata = {
-      id: materialId,
-      uuid: uuid,
-      title,
-      description,
-      category_id,
-      type: type as 'document' | 'presentation' | 'video' | 'link' | 'other',
-      difficulty: difficulty || undefined,
-      estimated_hours: estimated_hours ? parseFloat(estimated_hours) : undefined,
-      tags: tags ? tags.split(',').map((tag) => tag.trim()).filter((tag) => tag) : [],
-      folder_path: folderPath, // フォルダパスを追加
-      created_by: userId,
-      created_date: now,
-      updated_date: now,
-      is_published: true,
-      views: 0,
-      likes: 0,
-      attachments: attachmentList,
-    };
-
-    // metadata.jsonを保存
-    const metadataPath = path.join(uploadDir, 'metadata.json');
-    await writeJSON(metadataPath, metadata);
-    debug(MODULE_NAME, `metadata.json作成: ${metadataPath}`);
-
-    // SQLiteに追加（リトライ処理付き）
-    const db = getDatabase();
-    const insert = db.prepare(`
-      INSERT INTO materials (
-        id, uuid, title, description, category_id, type, difficulty, estimated_hours,
-        tags, folder_path, created_by, created_date, updated_date,
-        is_published, views, likes
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    
-    const params = [
-      materialId,
-      uuid,
-      title,
-      description || null,
-      category_id || null,
-      type,
-      difficulty || null,
-      estimated_hours ? parseFloat(estimated_hours) : null,
-      tags || '',
-      folderPath || '',
-      userId,
-      now,
-      now,
-      1, // is_published
-      0, // views
-      0  // likes
-    ];
-    
-    // リトライ処理（最大5回、指数バックオフ）
-    const maxRetries = 5;
-    let retryCount = 0;
-    let lastError: any = null;
-    
-    while (retryCount < maxRetries) {
-      try {
-        insert.run(...params);
-        if (retryCount > 0) {
-          debug(
-            MODULE_NAME,
-            `SQLiteに資料を追加成功（リトライ ${retryCount}回後）: materialId=${materialId}`
-          );
-          // SQLITE_BUSYが発生したが最終的に成功した場合のログ
-          await logBusyError(userId, 'uploadMaterial', retryCount, true, { materialId, title });
-        } else {
-          debug(MODULE_NAME, `SQLiteに資料を追加: materialId=${materialId}`);
-        }
-        break; // 成功したらループを抜ける
-      } catch (err: any) {
-        lastError = err;
-        // SQLITE_BUSYエラーの場合のみリトライ
-        if (err.code === 'SQLITE_BUSY' && retryCount < maxRetries - 1) {
-          retryCount++;
-          const waitTime = 50 * retryCount; // 50ms, 100ms, 150ms, 200ms
-          debug(MODULE_NAME, `SQLite書き込み競合検出（リトライ ${retryCount}回目）: materialId=${materialId}, ${waitTime}ms待機`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          continue;
-        }
-        // それ以外のエラーまたは最大リトライ回数に達した場合はエラーを投げる
-        throw err;
       }
-    }
-    
-    if (retryCount >= maxRetries && lastError) {
-      error(
-        MODULE_NAME,
-        `SQLite書き込み失敗（最大リトライ回数に達しました）: materialId=${materialId}`,
-        lastError
-      );
-      // SQLITE_BUSYが発生して最終的に失敗した場合のログ
-      await logBusyError(userId, 'uploadMaterial', retryCount, false, { materialId, title });
-      throw lastError;
-    }
 
-    await addMaterialRevision({
-      materialId,
-      updatedBy: userId,
-      updatedByName: userDisplayName || undefined,
-      comment: '初回登録',
-    });
+      // document.mdを作成
+      if (content && content.trim()) {
+        const documentPath = path.join(uploadDir, 'document.md');
+        await writeFile(documentPath, content, 'utf-8');
+        debug(MODULE_NAME, `document.md作成: ${documentPath}`);
+      }
+
+      // metadata.jsonを保存
+      const metadataPath = path.join(uploadDir, 'metadata.json');
+      await writeJSON(metadataPath, metadata);
+      debug(MODULE_NAME, `metadata.json作成: ${metadataPath}`);
+      
+      // 履歴をmetadata.jsonに追加（初回登録）
+      await addMaterialRevision({
+        materialId,
+        updatedBy: userId,
+        updatedByName: userDisplayName || undefined,
+        comment: '初回登録',
+        metadataPath,
+      });
+    } catch (fileSystemError: any) {
+      // ファイルシステムへの保存に失敗した場合、データベースから削除（ロールバック）
+      error(MODULE_NAME, `ファイルシステムへの保存に失敗: materialId=${materialId}`, fileSystemError);
+      try {
+        const deleteMaterialStmt = db.prepare('DELETE FROM materials WHERE id = ?');
+        const deleteMaterialResult = deleteMaterialStmt.run(materialId);
+        if (deleteMaterialResult.changes > 0) {
+          debug(MODULE_NAME, `データベースからロールバック: materialId=${materialId}`);
+        }
+      } catch (rollbackError) {
+        error(MODULE_NAME, `データベースからのロールバックに失敗: materialId=${materialId}`, rollbackError);
+      }
+      // ファイルシステムエラーを再スロー
+      throw fileSystemError;
+    }
 
     return NextResponse.json({
       success: true,
@@ -311,11 +358,44 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (err) {
-    error(MODULE_NAME, 'アップロードエラー:', err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const errorStack = err instanceof Error ? err.stack : undefined;
+    const errorCode = (err as any)?.code;
+    
+    error(MODULE_NAME, 'アップロードエラー:', {
+      message: errorMessage,
+      stack: errorStack,
+      code: errorCode,
+      folderPath,
+      materialId,
+      userId,
+    });
+    
+    // エラーの種類に応じて詳細なメッセージを返す
+    let userFriendlyMessage = 'アップロードに失敗しました';
+    if (errorCode === 'SQLITE_CONSTRAINT') {
+      if (errorMessage.includes('UNIQUE constraint')) {
+        userFriendlyMessage = '同じIDまたはUUIDの資料が既に存在します。時間をおいて再度お試しください。';
+      } else if (errorMessage.includes('FOREIGN KEY constraint')) {
+        userFriendlyMessage = 'カテゴリが存在しません。カテゴリを確認してください。';
+      } else {
+        userFriendlyMessage = 'データベースの制約エラーが発生しました。';
+      }
+    } else if (errorCode === 'SQLITE_BUSY' || errorCode === 'SQLITE_CANTOPEN_ISDIR') {
+      userFriendlyMessage = 'DB_BUSY';
+    } else if (errorMessage.includes('ENOENT') || errorMessage.includes('no such file')) {
+      userFriendlyMessage = '保存先フォルダが見つかりません。フォルダを確認してください。';
+    } else if (errorMessage.includes('EACCES') || errorMessage.includes('permission')) {
+      userFriendlyMessage = 'ファイルの書き込み権限がありません。';
+    }
+    
     return NextResponse.json(
       {
         success: false,
-        error: 'アップロードに失敗しました',
+        error: userFriendlyMessage,
+        errorDetail: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+        errorCode: errorCode || undefined,
+        errorStack: process.env.NODE_ENV === 'development' ? errorStack : undefined,
       },
       { status: 500 }
     );

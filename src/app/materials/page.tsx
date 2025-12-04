@@ -22,7 +22,7 @@ export default function MaterialsPage() {
   const searchParams = useSearchParams();
   const [showFilters, setShowFilters] = useState(false);
   const browserCommentCountUpdateRef = useRef<((materialId: string) => void) | null>(null);
-  const browserBookmarkCountUpdateRef = useRef<((materialId: string, bookmarkCount: number) => void) | null>(null);
+  const browserViewsUpdateRef = useRef<((materialId: string, views: number) => void) | null>(null);
 
   // ビューモード管理
   const { viewMode, setViewMode, mounted } = useMaterialsViewMode();
@@ -51,7 +51,7 @@ export default function MaterialsPage() {
     refreshMaterials,
     fetchMaterials,
     updateMaterialCommentCount,
-    updateMaterialBookmarkCount,
+    updateMaterialViews,
   } = useMaterialsPage();
 
   // ブラウザ管理
@@ -111,15 +111,6 @@ export default function MaterialsPage() {
     // 現在はMaterialCardとMaterialListItemで直接管理しているため、ここでは何もしない
   }, []);
 
-  // お気に入り数更新ハンドラー
-  const handleBookmarksUpdate = useCallback((materialId: string, bookmarkCount: number) => {
-    // 検索タブの更新
-    updateMaterialBookmarkCount(materialId, bookmarkCount);
-    // 階層表示の更新（MaterialLibraryBrowserのupdateMaterialBookmarkCountを呼ぶ）
-    if (browserBookmarkCountUpdateRef.current) {
-      browserBookmarkCountUpdateRef.current(materialId, bookmarkCount);
-    }
-  }, [updateMaterialBookmarkCount]);
 
   return (
     <div className="p-4 sm:p-4 lg:p-6 h-full w-full">
@@ -176,9 +167,8 @@ export default function MaterialsPage() {
               refreshTrigger={browser.browserRefreshTrigger}
               onPathChange={browser.handlePathChange}
               onCommentClick={handleCommentClick}
-              onBookmarksUpdate={handleBookmarksUpdate}
               onCommentCountUpdateRef={browserCommentCountUpdateRef}
-              onBookmarkCountUpdateRef={browserBookmarkCountUpdateRef}
+              onViewsUpdateRef={browserViewsUpdateRef}
             />
           ) : (
             /* 検索タブ */
@@ -205,7 +195,6 @@ export default function MaterialsPage() {
               onMaterialClick={handleMaterialClick}
               onBookmark={handleBookmark}
               onLikesUpdate={handleLikesUpdate}
-              onBookmarksUpdate={handleBookmarksUpdate}
               onRefresh={refreshMaterials}
               onCommentClick={handleCommentClick}
             />
@@ -250,6 +239,17 @@ export default function MaterialsPage() {
           } : undefined}
           creatorCache={creatorCache}
           onCreatorCacheUpdate={setCreatorCache}
+          onViewsUpdate={(materialId, views) => {
+            // 検索タブの更新
+            updateMaterialViews(materialId, views);
+            // 階層表示の更新（MaterialLibraryBrowserのupdateMaterialViewsを呼ぶ）
+            if (browserViewsUpdateRef.current) {
+              console.log('[materials/page] 階層表示の閲覧数も更新');
+              browserViewsUpdateRef.current(materialId, views);
+            } else {
+              console.warn('[materials/page] browserViewsUpdateRef.currentがnullです');
+            }
+          }}
         />
 
         {/* 資料作成モーダル */}

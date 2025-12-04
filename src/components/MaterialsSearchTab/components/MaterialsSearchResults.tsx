@@ -15,7 +15,6 @@ interface MaterialsSearchResultsProps {
   onMaterialClick: (material: MaterialNormalized) => void;
   onBookmark: (materialId: string) => void;
   onLikesUpdate?: (materialId: string, likes: number) => void;
-  onBookmarksUpdate?: (materialId: string, bookmarks: number) => void;
   onCommentClick?: (material: MaterialNormalized) => void;
   onContextMenu: (e: React.MouseEvent, material: MaterialNormalized) => void;
   searchTerm: string;
@@ -31,7 +30,6 @@ export default function MaterialsSearchResults({
   onMaterialClick,
   onBookmark,
   onLikesUpdate,
-  onBookmarksUpdate,
   onCommentClick,
   onContextMenu,
   searchTerm,
@@ -83,7 +81,6 @@ export default function MaterialsSearchResults({
                 onBookmark={onBookmark}
                 isBookmarked={bookmarkedIds.has(material.id)}
                 onLikesUpdate={onLikesUpdate}
-                onBookmarksUpdate={onBookmarksUpdate}
                 onCommentClick={onCommentClick ? () => onCommentClick(material) : undefined}
               />
             </div>

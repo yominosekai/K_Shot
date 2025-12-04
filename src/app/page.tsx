@@ -36,7 +36,7 @@ export default function HomePage() {
   } = useHomePageModals();
 
   // ランキングデータ
-  const [rankingType, setRankingType] = useState<'likes' | 'bookmarks' | 'views'>('likes');
+  const [rankingType, setRankingType] = useState<'likes' | 'views'>('likes');
   const { rankings, loading: rankingLoading, cached: rankingCached, refresh: refreshRankings } = useOverviewRankings(rankingType);
 
   // リフレッシュ処理

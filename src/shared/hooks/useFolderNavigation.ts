@@ -65,8 +65,6 @@ export function useFolderNavigation({
         params.append('sort_by', 'updated_date');
         params.append('sort_order', 'desc');
         
-        // お気に入り数を一括取得
-        params.append('include_bookmark_counts', 'true');
 
         const materialsResponse = await fetch(`/api/materials?${params.toString()}`);
         if (materialsResponse.ok) {
@@ -210,16 +208,30 @@ export function useFolderNavigation({
     }
   }, []);
 
-  // 該当する資料のお気に入り数だけを更新
-  const updateMaterialBookmarkCount = useCallback(async (materialId: string, bookmarkCount: number) => {
-    setMaterials((prevMaterials) => {
-      return prevMaterials.map((material) =>
-        material.id === materialId
-          ? { ...material, bookmark_count: bookmarkCount }
-          : material
-      );
-    });
+  // 該当する資料の閲覧数だけを更新
+  const updateMaterialViews = useCallback(async (materialId: string, views: number) => {
+    try {
+      console.log('[useFolderNavigation] updateMaterialViews開始:', materialId, views);
+      setMaterials((prevMaterials) => {
+        const updated = prevMaterials.map((material) =>
+          material.id === materialId
+            ? { ...material, views }
+            : material
+        );
+        console.log('[useFolderNavigation] 閲覧数更新:', {
+          materialId,
+          oldViews: prevMaterials.find(m => m.id === materialId)?.views,
+          newViews: views,
+          updatedViews: updated.find(m => m.id === materialId)?.views,
+        });
+        return updated;
+      });
+    } catch (err) {
+      console.error('[useFolderNavigation] 閲覧数更新エラー:', err);
+    }
   }, []);
+
+  // 該当する資料のお気に入り数だけを更新
 
   return {
     currentPath,
@@ -231,7 +243,7 @@ export function useFolderNavigation({
     handleFolderClick,
     handleBreadcrumbClick,
     updateMaterialCommentCount,
-    updateMaterialBookmarkCount,
+    updateMaterialViews,
   };
 }
 

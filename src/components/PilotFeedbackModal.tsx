@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Save, Star, ChevronRight, ChevronLeft, FileText, Search, MessageSquare, Settings, Zap, Shield, Database } from 'lucide-react';
+import { X, Save, Star, ChevronRight, ChevronLeft, FileText, Search, MessageSquare, Settings, Zap, Shield, Database, CheckCircle } from 'lucide-react';
+import ProgressModal from './ProgressModal';
 import { useAuth } from '@/contexts/AuthContext';
 import Toast from '@/components/Toast';
 import type { 
@@ -98,6 +99,10 @@ export default function PilotFeedbackModal({ isOpen, onClose }: PilotFeedbackMod
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [isToastVisible, setIsToastVisible] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('読み込み中...');
   
   // フォームデータ
   const [scenes, setScenes] = useState<PilotFeedbackScene[]>([]);
@@ -118,12 +123,37 @@ export default function PilotFeedbackModal({ isOpen, onClose }: PilotFeedbackMod
       setImprovementIdeas('');
       setAdditionalComments('');
       setExistingFeedback(null);
+      setCountdown(null);
+      setIsLoading(false);
+      setLoadingProgress(0);
+      setLoadingMessage('読み込み中...');
     }
   }, [isOpen, user?.id]);
 
   const loadExistingFeedback = async () => {
+    setIsLoading(true);
+    setLoadingProgress(0);
+    setLoadingMessage('フィードバックデータを読み込み中...');
+
     try {
+      // 簡易的なプログレスバー（API読み込みの進捗は正確に取得できないため）
+      const progressInterval = setInterval(() => {
+        setLoadingProgress((prev) => {
+          const newProgress = prev + 10; // 10%ずつ増加
+          if (newProgress >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return newProgress;
+        });
+      }, 100); // 100msごとに更新
+
       const response = await fetch('/api/pilot-feedback');
+      
+      clearInterval(progressInterval);
+      setLoadingProgress(100);
+      setLoadingMessage('読み込み完了');
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.feedback) {
@@ -135,8 +165,19 @@ export default function PilotFeedbackModal({ isOpen, onClose }: PilotFeedbackMod
           setAdditionalComments(feedback.additional_comments || '');
         }
       }
+
+      // 少し待ってからモーダルを表示（プログレスバーが100%になるのを見せるため）
+      setTimeout(() => {
+        setIsLoading(false);
+        setLoadingProgress(0);
+      }, 300);
     } catch (err) {
       console.error('既存フィードバック読み込みエラー:', err);
+      setLoadingMessage('読み込みエラーが発生しました');
+      setTimeout(() => {
+        setIsLoading(false);
+        setLoadingProgress(0);
+      }, 1000);
     }
   };
 
@@ -211,6 +252,25 @@ export default function PilotFeedbackModal({ isOpen, onClose }: PilotFeedbackMod
         setToastMessage('フィードバックを保存しました');
         setIsToastVisible(true);
         await loadExistingFeedback();
+        
+        // カウントダウンを開始
+        setCountdown(3);
+        const countdownInterval = setInterval(() => {
+          setCountdown((prev) => {
+            if (prev === null || prev <= 1) {
+              clearInterval(countdownInterval);
+              return null;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        
+        // 3秒後に自動的に閉じる
+        setTimeout(() => {
+          clearInterval(countdownInterval);
+          setCountdown(null);
+          onClose();
+        }, 3000);
       } else {
         setToastMessage(data.error || 'フィードバックの保存に失敗しました');
         setIsToastVisible(true);
@@ -252,6 +312,19 @@ export default function PilotFeedbackModal({ isOpen, onClose }: PilotFeedbackMod
   };
 
   if (!isOpen) return null;
+
+  // 読み込み中はプログレスバーのみ表示
+  if (isLoading) {
+    return (
+      <ProgressModal
+        isVisible={isLoading}
+        progress={loadingProgress}
+        message={loadingMessage}
+        title="読込中..."
+        zIndex={200}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black bg-opacity-50">
@@ -496,13 +569,18 @@ export default function PilotFeedbackModal({ isOpen, onClose }: PilotFeedbackMod
             ) : (
               <button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || countdown !== null}
                 className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {saving ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     <span>保存中...</span>
+                  </>
+                ) : countdown !== null ? (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>保存完了。{countdown}秒後に閉じます</span>
                   </>
                 ) : (
                   <>

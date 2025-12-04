@@ -45,7 +45,6 @@ interface MaterialsSearchTabProps {
   onMaterialClick: (material: MaterialNormalized) => void;
   onBookmark: (materialId: string) => void;
   onLikesUpdate?: (materialId: string, likes: number) => void;
-  onBookmarksUpdate?: (materialId: string, bookmarks: number) => void;
   onRefresh?: () => Promise<void>;
   onCommentClick?: (material: MaterialNormalized) => void;
 }
@@ -73,7 +72,6 @@ export default function MaterialsSearchTab({
   onMaterialClick,
   onBookmark,
   onLikesUpdate,
-  onBookmarksUpdate,
   onRefresh,
   onCommentClick,
 }: MaterialsSearchTabProps) {
@@ -182,7 +180,6 @@ export default function MaterialsSearchTab({
           onMaterialClick={onMaterialClick}
           onBookmark={onBookmark}
           onLikesUpdate={onLikesUpdate}
-          onBookmarksUpdate={onBookmarksUpdate}
           onCommentClick={onCommentClick}
           onContextMenu={handleContextMenu}
           searchTerm={searchTerm}

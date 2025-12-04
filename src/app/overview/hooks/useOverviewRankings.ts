@@ -11,7 +11,7 @@ interface RankingItem {
   createdByAvatar?: string;
 }
 
-export function useOverviewRankings(rankingType: 'likes' | 'bookmarks' | 'views') {
+export function useOverviewRankings(rankingType: 'likes' | 'views') {
   const [rankings, setRankings] = useState<RankingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [cached, setCached] = useState(false);

@@ -154,10 +154,9 @@ export function useFavoritesContextMenu({
               if (response.ok) {
                 const data = await response.json();
                 if (data.success && data.material) {
-                  // 既存のmaterialオブジェクトの統計情報（bookmark_count, views, likes）を保持
+                  // 既存のmaterialオブジェクトの統計情報（views, likes）を保持
                   onShowInfo({
                     ...data.material,
-                    bookmark_count: material.bookmark_count ?? data.material.bookmark_count ?? 0,
                     views: material.views ?? data.material.views ?? 0,
                     likes: material.likes ?? data.material.likes ?? 0,
                   });

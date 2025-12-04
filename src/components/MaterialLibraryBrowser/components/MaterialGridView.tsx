@@ -10,7 +10,6 @@ interface MaterialGridViewProps {
   bookmarkedIds: Set<string>;
   onCommentClick?: (material: MaterialNormalized) => void;
   onLikesUpdate?: (materialId: string, likes: number) => void;
-  onBookmarksUpdate?: (materialId: string, bookmarks: number) => void;
   onContextMenu: (e: React.MouseEvent, material: MaterialNormalized) => void;
 }
 
@@ -21,7 +20,6 @@ export default function MaterialGridView({
   bookmarkedIds,
   onCommentClick,
   onLikesUpdate,
-  onBookmarksUpdate,
   onContextMenu,
 }: MaterialGridViewProps) {
   return (
@@ -41,7 +39,6 @@ export default function MaterialGridView({
             onBookmark={onBookmark}
             isBookmarked={bookmarkedIds.has(material.id)}
             onLikesUpdate={onLikesUpdate}
-            onBookmarksUpdate={onBookmarksUpdate}
             onCommentClick={onCommentClick ? () => onCommentClick(material) : undefined}
           />
         </div>

@@ -42,10 +42,9 @@ export function useMaterialsSearchModals() {
     // 詳細情報を取得してからファイル情報モーダルを開く
     const detail = await fetchMaterialDetail(material.id);
     if (detail) {
-      // 既存のmaterialオブジェクトの統計情報（bookmark_count, views, likes）を保持
+      // 既存のmaterialオブジェクトの統計情報（views, likes）を保持
       setInfoMaterial({
         ...detail,
-        bookmark_count: material.bookmark_count ?? detail.bookmark_count ?? 0,
         views: material.views ?? detail.views ?? 0,
         likes: material.likes ?? detail.likes ?? 0,
       });

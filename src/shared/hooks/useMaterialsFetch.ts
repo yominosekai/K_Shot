@@ -66,8 +66,6 @@ export function useMaterialsFetch() {
         params.append('sort_by', 'updated_date');
         params.append('sort_order', 'desc');
         
-        // お気に入り数を一括取得
-        params.append('include_bookmark_counts', 'true');
         
         // 差分更新：前回取得時刻以降の変更のみ取得
         // ただし、フィルター条件が変更された場合、または強制リフレッシュの場合は全件取得
@@ -127,7 +125,6 @@ export function useMaterialsFetch() {
               }
               fullParams.append('sort_by', 'updated_date');
               fullParams.append('sort_order', 'desc');
-              fullParams.append('include_bookmark_counts', 'true');
               // sinceパラメータを付けない（全件取得）
               
               const fullResponse = await fetch(`/api/materials?${fullParams.toString()}`);
@@ -260,15 +257,27 @@ export function useMaterialsFetch() {
     }
   }, []);
 
-  // 該当する資料のお気に入り数だけを更新
-  const updateMaterialBookmarkCount = useCallback(async (materialId: string, bookmarkCount: number) => {
-    setMaterials((prevMaterials) => {
-      return prevMaterials.map((material) =>
-        material.id === materialId
-          ? { ...material, bookmark_count: bookmarkCount }
-          : material
-      );
-    });
+  // 該当する資料の閲覧数だけを更新
+  const updateMaterialViews = useCallback(async (materialId: string, views: number) => {
+    try {
+      console.log('[useMaterialsFetch] updateMaterialViews開始:', materialId, views);
+      setMaterials((prevMaterials) => {
+        const updated = prevMaterials.map((material) =>
+          material.id === materialId
+            ? { ...material, views }
+            : material
+        );
+        console.log('[useMaterialsFetch] 閲覧数更新:', {
+          materialId,
+          oldViews: prevMaterials.find(m => m.id === materialId)?.views,
+          newViews: views,
+          updatedViews: updated.find(m => m.id === materialId)?.views,
+        });
+        return updated;
+      });
+    } catch (err) {
+      console.error('[useMaterialsFetch] 閲覧数更新エラー:', err);
+    }
   }, []);
 
   return {
@@ -278,7 +287,7 @@ export function useMaterialsFetch() {
     fetchMaterials,
     refreshMaterials,
     updateMaterialCommentCount,
-    updateMaterialBookmarkCount,
+    updateMaterialViews,
   };
 }
 
