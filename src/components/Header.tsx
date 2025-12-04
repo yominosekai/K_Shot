@@ -8,6 +8,8 @@ import RoleChangeModal from '@/components/RoleChangeModal';
 import NotificationModal from '@/components/NotificationModal';
 import MaterialModal from '@/components/MaterialModal';
 import UserDetailModal from '@/components/UserDetailModal';
+import PilotFeedbackModal from '@/components/PilotFeedbackModal';
+import { isPilotTestEnabled } from '@/config/pilot-test';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { MaterialNormalized } from '@/features/materials/types';
@@ -29,6 +31,7 @@ export default function Header() {
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isPilotFeedbackModalOpen, setIsPilotFeedbackModalOpen] = useState(false);
 
   // 通知ポーリング
   const { connectionStatus, fetchNotificationCount } = useNotificationPolling({
@@ -139,6 +142,7 @@ export default function Header() {
             <HeaderUserMenu
               user={user}
               onRoleChangeClick={() => setIsRoleChangeModalOpen(true)}
+              onPilotFeedbackClick={isPilotTestEnabled() ? () => setIsPilotFeedbackModalOpen(true) : undefined}
             />
           </div>
         </div>
@@ -184,6 +188,14 @@ export default function Header() {
         }}
         user={selectedUser}
       />
+
+      {/* パイロットテストフィードバックモーダル */}
+      {isPilotTestEnabled() && (
+        <PilotFeedbackModal
+          isOpen={isPilotFeedbackModalOpen}
+          onClose={() => setIsPilotFeedbackModalOpen(false)}
+        />
+      )}
     </header>
   );
 }

@@ -1,9 +1,10 @@
 'use client';
 
-import { Home, FileText, BarChart, Settings, Users, Trash2, Database, AlertTriangle, Heart, MessageSquare } from 'lucide-react';
+import { Home, FileText, BarChart, Settings, Users, Trash2, Database, AlertTriangle, Heart, MessageSquare, ClipboardCheck } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { isPilotTestEnabled } from '@/config/pilot-test';
 
 const navigation = [
   { id: 'home', icon: Home, label: 'ホーム', href: '/' },
@@ -20,6 +21,10 @@ const adminNavigation = [
   { id: 'database', icon: Database, label: 'データベース', href: '/admin/database' },
   { id: 'logs', icon: AlertTriangle, label: 'エラーチェック', href: '/admin/logs' },
   { id: 'admin-feedback', icon: MessageSquare, label: 'ご意見・ご要望管理', href: '/admin/feedback' },
+  // パイロットテスト統計（機能フラグで制御）
+  ...(isPilotTestEnabled()
+    ? [{ id: 'pilot-feedback-stats', icon: ClipboardCheck, label: 'パイロットテスト統計', href: '/admin/pilot-feedback-stats' }]
+    : []),
 ];
 
 const trashNavigation = [

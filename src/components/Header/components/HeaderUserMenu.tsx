@@ -3,18 +3,20 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { User, Shield, HelpCircle, Info, Lightbulb } from 'lucide-react';
+import { User, Shield, HelpCircle, Info, Lightbulb, ClipboardCheck } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { User as UserType } from '@/features/auth/types';
 import { useUsers } from '@/contexts/UsersContext';
+import { isPilotTestEnabled, PILOT_TEST_CONFIG } from '@/config/pilot-test';
 
 interface HeaderUserMenuProps {
   user: UserType | null;
   onRoleChangeClick: () => void;
+  onPilotFeedbackClick?: () => void;
 }
 
-export default function HeaderUserMenu({ user, onRoleChangeClick }: HeaderUserMenuProps) {
+export default function HeaderUserMenu({ user, onRoleChangeClick, onPilotFeedbackClick }: HeaderUserMenuProps) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -121,6 +123,21 @@ export default function HeaderUserMenu({ user, onRoleChangeClick }: HeaderUserMe
             <Shield className="w-4 h-4" />
             <span>権限変更</span>
           </button>
+          {isPilotTestEnabled() && onPilotFeedbackClick && (
+            <>
+              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+              <button
+                onClick={() => {
+                  onPilotFeedbackClick();
+                  setIsUserMenuOpen(false);
+                }}
+                className="w-full flex items-center space-x-3 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <ClipboardCheck className="w-4 h-4" />
+                <span>パイロットテスト評価</span>
+              </button>
+            </>
+          )}
           <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
           <Link
             href="/philosophy"
