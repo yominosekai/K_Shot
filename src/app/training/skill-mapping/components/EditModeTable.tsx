@@ -8,6 +8,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import type { SkillPhaseItem, NewRow } from './types';
 import PhaseCell from './PhaseCell';
 import SortableRowCell from './SortableRowCell';
+import SortableRow from './SortableRow';
 
 interface EditModeTableProps {
   data: SkillPhaseItem[];
@@ -16,6 +17,7 @@ interface EditModeTableProps {
   newRows?: NewRow[];
   onNewRowsChange?: (newRows: NewRow[]) => void;
   originalData?: SkillPhaseItem[]; // 編集前のデータ（変更検出用）
+  onRowOrderChange?: (rowOrder: string[]) => void; // 行の順序が変わったときに呼ばれる
 }
 
 export default function EditModeTable({ 
@@ -24,7 +26,8 @@ export default function EditModeTable({
   errorRowIds = new Set<string>(),
   newRows = [],
   onNewRowsChange,
-  originalData = []
+  originalData = [],
+  onRowOrderChange
 }: EditModeTableProps) {
   // 行の順序を管理する状態
   const [rowOrder, setRowOrder] = useState<string[]>([]);
@@ -87,8 +90,18 @@ export default function EditModeTable({
       });
     });
 
-    // ソート済みのrowsに新規行を挿入
+    // displayOrderに基づいてソート（displayOrderが設定されている場合はそれを使用）
     const sortedRows = rows.sort((a, b) => {
+      // 各行のdisplayOrderを取得（最初のデータのdisplayOrderを使用）
+      const aDisplayOrder = grouped[a.id]?.[0]?.displayOrder ?? 999999;
+      const bDisplayOrder = grouped[b.id]?.[0]?.displayOrder ?? 999999;
+      
+      // displayOrderでソート
+      if (aDisplayOrder !== bDisplayOrder) {
+        return aDisplayOrder - bDisplayOrder;
+      }
+      
+      // displayOrderが同じ場合は既存のソートロジックを使用
       const categoryOrder = ['共通', 'RedTeam', 'PurpleTeam', 'BlueTeam', 'インフラ'];
       const aCatIdx = categoryOrder.indexOf(a.category);
       const bCatIdx = categoryOrder.indexOf(b.category);
@@ -130,6 +143,12 @@ export default function EditModeTable({
 
   // editRowsが変更されたときに順序を初期化
   useEffect(() => {
+    // rowOrderが既に設定されている場合は、ドラッグ&ドロップで変更された可能性があるため上書きしない
+    if (rowOrder.length > 0) {
+      return;
+    }
+    
+    // rowOrderが空の場合のみ初期化
     const currentOrder = editRows.map(row => row.id);
     const currentOrderStr = currentOrder.join(',');
     const existingOrderStr = rowOrder.join(',');
@@ -137,6 +156,10 @@ export default function EditModeTable({
     // 順序が変わった場合のみ更新（無限ループを防ぐため）
     if (currentOrderStr !== existingOrderStr && currentOrder.length > 0) {
       setRowOrder(currentOrder);
+      // 親コンポーネントに行の順序の変更を通知
+      if (onRowOrderChange) {
+        onRowOrderChange(currentOrder);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editRows.length, newRows.length, data.length]);
@@ -179,11 +202,6 @@ export default function EditModeTable({
 
     if (!activeRow || !overRow) return;
 
-    // 同じ階層（同じcategory、同じitem）内でのみ移動可能
-    if (activeRow.category !== overRow.category || activeRow.item !== overRow.item) {
-      return;
-    }
-
     const currentIndex = rowOrder.indexOf(activeId);
     const newIndex = rowOrder.indexOf(overId);
 
@@ -191,6 +209,10 @@ export default function EditModeTable({
 
     const newOrder = arrayMove(rowOrder, currentIndex, newIndex);
     setRowOrder(newOrder);
+    // 親コンポーネントに行の順序の変更を通知
+    if (onRowOrderChange) {
+      onRowOrderChange(newOrder);
+    }
   };
 
   const handleAddRow = (insertAfterRowId?: string) => {
@@ -375,12 +397,19 @@ export default function EditModeTable({
                                    'hover:bg-gray-50 dark:hover:bg-gray-800';
 
                 return (
-                  <tr key={row.id} className={`${hoverClass} ${hasError || newRowError ? 'bg-red-50 dark:bg-red-900' : ''} ${isRowNew && !newRowError ? 'bg-green-50 dark:bg-green-900' : ''}`}>
-                    <SortableRowCell
-                      id={row.id}
-                      displayIndex={displayIndex}
-                      isLastRow={isLastRow}
-                    />
+                  <SortableRow
+                    key={row.id}
+                    id={row.id}
+                    className={`${hoverClass} ${hasError || newRowError ? 'bg-red-50 dark:bg-red-900' : ''} ${isRowNew && !newRowError ? 'bg-green-50 dark:bg-green-900' : ''}`}
+                  >
+                    {(dragHandleProps) => (
+                      <>
+                        <SortableRowCell
+                          id={row.id}
+                          displayIndex={displayIndex}
+                          isLastRow={isLastRow}
+                          dragHandleProps={dragHandleProps}
+                        />
                     <td className={`border border-gray-400 dark:border-gray-600 px-4 py-3 text-sm text-gray-900 dark:text-white font-semibold text-center align-middle ${categoryChanged && !hasError && !newRowError ? 'bg-green-100 dark:bg-green-800' : 'bg-gray-100 dark:bg-gray-800'}`} style={{ width: '120px', minWidth: '120px' }}>
                       {isNewRow ? (
                         <>
@@ -549,7 +578,9 @@ export default function EditModeTable({
                         </button>
                       </div>
                     </td>
-                  </tr>
+                      </>
+                    )}
+                  </SortableRow>
                 );
               })}
             </tbody>

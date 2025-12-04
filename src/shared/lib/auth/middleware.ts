@@ -193,6 +193,14 @@ export async function requireInstructor(): Promise<AuthResult | AuthError> {
 }
 
 /**
+ * 認証必須 + 教育訓練権限チェック（管理者も含む）
+ * @returns 認証成功かつ教育訓練または管理者の場合はユーザー情報、それ以外はNextResponse
+ */
+export async function requireTraining(): Promise<AuthResult | AuthError> {
+  return requireRole('training');
+}
+
+/**
  * 本人または管理者のみアクセス可能
  * @param targetUserId 対象ユーザーのID
  * @returns 認証成功かつ本人または管理者の場合はユーザー情報、それ以外はNextResponse

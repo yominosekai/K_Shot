@@ -42,13 +42,26 @@ export default function ExcelViewModeTable({ data }: ExcelViewModeTableProps) {
     phase5: string;
   }> = [];
 
-  // 大分類の順序（データから動的に取得、なければアルファベット順）
-  const categories = Object.keys(categoryGroups).sort();
+  // displayOrderを取得するヘルパー関数
+  const getDisplayOrder = (key: string): number => {
+    return grouped[key]?.[0]?.displayOrder ?? 999999;
+  };
+
+  // 大分類の順序（displayOrderに基づいてソート）
+  const categories = Object.keys(categoryGroups).sort((a, b) => {
+    const firstKeyA = categoryGroups[a][0];
+    const firstKeyB = categoryGroups[b][0];
+    const aOrder = getDisplayOrder(firstKeyA);
+    const bOrder = getDisplayOrder(firstKeyB);
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    // displayOrderが同じ場合はアルファベット順
+    return a.localeCompare(b);
+  });
 
   categories.forEach((category) => {
     if (!categoryGroups[category]) return;
 
-    // 項目ごとにグループ化
+    // 項目ごとにグループ化（displayOrderに基づいてソート）
     const itemGroups: Record<string, string[]> = {};
     categoryGroups[category].forEach((key) => {
       const [, item] = key.split('|');
@@ -57,9 +70,19 @@ export default function ExcelViewModeTable({ data }: ExcelViewModeTableProps) {
       }
       itemGroups[item].push(key);
     });
+    
+    // 各項目グループをdisplayOrderでソート
+    const sortedItemKeys = Object.keys(itemGroups).sort((itemA, itemB) => {
+      const keyA = itemGroups[itemA][0];
+      const keyB = itemGroups[itemB][0];
+      const itemAOrder = getDisplayOrder(keyA);
+      const itemBOrder = getDisplayOrder(keyB);
+      if (itemAOrder !== itemBOrder) return itemAOrder - itemBOrder;
+      return itemA.localeCompare(itemB);
+    });
 
     let categoryRowspan = 0;
-    Object.keys(itemGroups).forEach((item) => {
+    sortedItemKeys.forEach((item) => {
       let itemRowspan = 0;
       itemGroups[item].forEach((key) => {
         itemRowspan += 1; // 中分類ごとに1行
@@ -68,14 +91,22 @@ export default function ExcelViewModeTable({ data }: ExcelViewModeTableProps) {
     });
 
     let categoryRowspanUsed = 0;
-    Object.keys(itemGroups).forEach((item, itemIdx) => {
+    sortedItemKeys.forEach((item, itemIdx) => {
       let itemRowspan = 0;
-      itemGroups[item].forEach((key) => {
+      // 中分類をdisplayOrderでソート
+      const sortedSubCategoryKeys = itemGroups[item].sort((keyA, keyB) => {
+        const orderA = getDisplayOrder(keyA);
+        const orderB = getDisplayOrder(keyB);
+        if (orderA !== orderB) return orderA - orderB;
+        return keyA.localeCompare(keyB);
+      });
+      
+      sortedSubCategoryKeys.forEach((key) => {
         itemRowspan += 1; // 中分類ごとに1行
       });
 
       let itemRowspanUsed = 0;
-      itemGroups[item].forEach((key, subIdx) => {
+      sortedSubCategoryKeys.forEach((key, subIdx) => {
         const [, , subCategory] = key.split('|');
         const subCategoryData = grouped[key];
 

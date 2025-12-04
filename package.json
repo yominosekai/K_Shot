@@ -36,7 +36,9 @@
     "rehype-raw": "^7.0.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
@@ -46,6 +48,7 @@
     "@types/react": "^19.0.6",
     "@types/react-dom": "^19.0.2",
     "@types/uuid": "^10.0.0",
+    "@types/xlsx": "^0.0.35",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^2.1.8",
     "@vitest/ui": "^2.1.9",

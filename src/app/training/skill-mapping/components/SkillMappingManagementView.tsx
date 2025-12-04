@@ -3,12 +3,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import FullscreenToggleButton from '@/components/FullscreenToggleButton';
 import type { SkillPhaseItem as BaseSkillPhaseItem } from '@/shared/lib/data-access/skill-mapping';
 import type { SkillPhaseItem, NewRow } from './types';
 import ExcelViewModeTable from './ExcelViewModeTable';
 import EditModeTable from './EditModeTable';
 import SaveConfirmModal from './SaveConfirmModal';
 import NewItemsModal from './NewItemsModal';
+import ImportPreviewModal from './ImportPreviewModal';
 import { validateData } from './validation';
 import { compareData, type ComparisonResult } from './utils/compareData';
 
@@ -33,6 +35,15 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
   const [showNewItemsModal, setShowNewItemsModal] = useState(false);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [rowOrder, setRowOrder] = useState<string[]>([]); // 行の順序を管理
+  const [showImportPreviewModal, setShowImportPreviewModal] = useState(false);
+  const [importPreviewData, setImportPreviewData] = useState<{
+    items: SkillPhaseItem[];
+    errors?: string[];
+    rowCount: number;
+    errorCount: number;
+  } | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   // スキルマスタデータを取得
   useEffect(() => {
@@ -74,6 +85,7 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
       setEditItems(convertedItems);
       setOriginalData(convertedItems);
       setNewRows([]);
+      setRowOrder([]); // 行の順序をリセット
       setIsEditMode(true);
     } else {
       // 編集モードをキャンセル
@@ -81,6 +93,7 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
       setEditItems([]);
       setNewRows([]);
       setOriginalData([]);
+      setRowOrder([]); // 行の順序をリセット
     }
   };
 
@@ -160,17 +173,34 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
     setIsSaving(true);
     
     try {
+      // 行の順序に基づいてdisplayOrderを設定
+      // 同じ中分類（category|item|subCategory）のすべての項目に同じdisplayOrderを割り当てる
+      const rowOrderMap = new Map<string, number>();
+      
+      // rowOrderに基づいて順序を決定
+      rowOrder.forEach((rowId, index) => {
+        rowOrderMap.set(rowId, index + 1); // 1から始まる順序番号
+      });
+      
       // 新規行のデータ（newRowIdが設定されているデータ）を正規のIDに変換
+      // 同時にdisplayOrderを設定
       const dataToSave = editItems.map(item => {
+        const rowKey = `${item.category}|${item.item}|${item.subCategory}`;
+        const displayOrder = rowOrderMap.get(rowKey) ?? null;
+        
         if (item.newRowId) {
           // 新規行のデータは、newRowIdを削除して正規のIDを生成
           const { newRowId, ...rest } = item;
           return {
             ...rest,
-            id: Math.abs(item.id) // 負のIDを正のIDに変換
+            id: Math.abs(item.id), // 負のIDを正のIDに変換
+            displayOrder: displayOrder
           };
         }
-        return item;
+        return {
+          ...item,
+          displayOrder: displayOrder
+        };
       });
       
       const response = await fetch('/api/skill-mapping/items', {
@@ -191,6 +221,7 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
         setNewRows([]);
         setEditItems([]);
         setOriginalData([]);
+        setRowOrder([]); // 行の順序をリセット
         setValidationErrors([]);
         setErrorRowIds(new Set());
         alert('データベースに同期しました');
@@ -300,6 +331,16 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
           body: formData,
         });
 
+        // レスポンスがJSONかどうかを確認
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          // HTMLエラーページが返された場合
+          const text = await response.text();
+          console.error('非JSONレスポンス:', text.substring(0, 200));
+          alert(`エラー: サーバーエラーが発生しました。APIエンドポイントが正しく実装されているか確認してください。`);
+          return;
+        }
+
         const result = await response.json();
 
         if (!response.ok) {
@@ -312,16 +353,65 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
           return;
         }
 
-        // プレビューデータを設定してモーダルを表示（後で実装）
-        // setImportPreviewData(result);
-        // setShowImportPreviewModal(true);
-        alert('プレビュー機能は後で実装します');
+        // プレビューデータを設定してモーダルを表示
+        setImportPreviewData({
+          items: result.items || [],
+          errors: result.errors,
+          rowCount: result.rowCount || 0,
+          errorCount: result.errorCount || 0,
+        });
+        setShowImportPreviewModal(true);
       } catch (error) {
         console.error('プレビューエラー:', error);
         alert('プレビュー中にエラーが発生しました。');
       }
     };
     input.click();
+  };
+
+  const handleImportExecute = async () => {
+    if (!importFile || !importPreviewData) return;
+
+    try {
+      setIsImporting(true);
+      const formData = new FormData();
+      formData.append('file', importFile);
+      formData.append('type', importType);
+      formData.append('execute', 'true');
+
+      const response = await fetch('/api/skill-mapping/import-excel', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (result.details && Array.isArray(result.details)) {
+          const errorMessage = `インポートエラー：${result.error}\n\nエラー詳細：\n${result.details.slice(0, 10).join('\n')}${result.details.length > 10 ? `\n...他${result.details.length - 10}件のエラー` : ''}`;
+          alert(errorMessage);
+        } else {
+          alert(`インポートエラー：${result.error || '不明なエラーが発生しました'}`);
+        }
+        return;
+      }
+
+      if (result.success) {
+        alert(result.message || `${result.importedCount || 0}件のデータをインポートしました`);
+        setShowImportPreviewModal(false);
+        setImportPreviewData(null);
+        setImportFile(null);
+        // データを再取得
+        await fetchItems();
+      } else {
+        alert(`インポートエラー：${result.error || '不明なエラーが発生しました'}`);
+      }
+    } catch (error) {
+      console.error('インポート実行エラー:', error);
+      alert('インポート実行中にエラーが発生しました。');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   if (loading) {
@@ -344,13 +434,17 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
     <div className="space-y-6">
       {/* ヘッダー */}
       <div className="mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            スキルマッピング管理
-          </h2>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            スキルマスタデータの管理と全体進捗の確認
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              スキルマッピング管理
+            </h2>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">
+              スキルマスタデータの管理と全体進捗の確認
+            </p>
+          </div>
+          {/* 最大化ボタン */}
+          <FullscreenToggleButton className="ml-4" />
         </div>
       </div>
 
@@ -466,6 +560,7 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
                     onNewRowsChange={setNewRows}
                     originalData={originalData}
                     errorRowIds={errorRowIds}
+                    onRowOrderChange={setRowOrder}
                   />
                 )}
               </div>
@@ -488,6 +583,19 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
           )}
         </div>
       </div>
+
+      {/* インポートプレビューモーダル */}
+      <ImportPreviewModal
+        isOpen={showImportPreviewModal}
+        onClose={() => {
+          setShowImportPreviewModal(false);
+          setImportPreviewData(null);
+          setImportFile(null);
+        }}
+        onConfirm={handleImportExecute}
+        previewData={importPreviewData}
+        isExecuting={isImporting}
+      />
 
       {/* 新規項目・類似項目モーダル */}
       <NewItemsModal
