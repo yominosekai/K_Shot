@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import FullscreenToggleButton from '@/components/FullscreenToggleButton';
 import { useConfirmDialog } from '@/contexts/ConfirmDialogContext';
 import type { SkillPhaseItem as BaseSkillPhaseItem } from '@/shared/lib/data-access/skill-mapping';
@@ -14,6 +14,8 @@ import NewItemsModal from './NewItemsModal';
 import ImportPreviewModal from './ImportPreviewModal';
 import { validateData } from './validation';
 import { compareData, type ComparisonResult } from './utils/compareData';
+import type { User } from '@/features/auth/types';
+import SkillMappingView from '@/components/SkillMappingView';
 
 interface SkillMappingManagementViewProps {}
 
@@ -46,11 +48,47 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
     errorCount: number;
   } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  
+  // 利用者スキルマップ確認用のstate
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [usersLoading, setUsersLoading] = useState(false);
 
   // スキルマスタデータを取得
   useEffect(() => {
     fetchItems();
   }, []);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      setUsersLoading(true);
+      const response = await fetch('/api/users');
+      if (!response.ok) {
+        throw new Error('ユーザー一覧の取得に失敗しました');
+      }
+      const data = await response.json();
+      if (data.success) {
+        setUsers(data.users || []);
+        // 最初のユーザーを選択（ユーザーが存在する場合）
+        if (data.users && data.users.length > 0 && !selectedUserId) {
+          setSelectedUserId(data.users[0].id);
+        }
+      } else {
+        throw new Error(data.error || 'ユーザー一覧の取得に失敗しました');
+      }
+    } catch (err) {
+      console.error('ユーザー一覧取得エラー:', err);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [selectedUserId]);
+
+  // 利用者スキルマップ確認タブがアクティブになったときにユーザー一覧を取得
+  useEffect(() => {
+    if (activeTab === 'view') {
+      fetchUsers();
+    }
+  }, [activeTab, fetchUsers]);
 
   const fetchItems = async () => {
     try {
@@ -596,12 +634,46 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
           {/* タブコンテンツ */}
           {activeTab === 'view' && (
             <div className="space-y-6">
-              {/* 空ページ（後で実装） */}
-              <div>
-                <p className="text-gray-500 dark:text-gray-400">
-                  スキルマッピング確認ページは後で実装します。
-                </p>
+              {/* 利用者選択ドロップダウン */}
+              <div className="flex items-center gap-4">
+                <label htmlFor="user-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  利用者選択:
+                </label>
+                <select
+                  id="user-select"
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  disabled={usersLoading}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {usersLoading ? (
+                    <option value="">読み込み中...</option>
+                  ) : users.length === 0 ? (
+                    <option value="">ユーザーが見つかりません</option>
+                  ) : (
+                    users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.display_name} ({user.username})
+                      </option>
+                    ))
+                  )}
+                </select>
               </div>
+
+              {/* スキルマップ表示 */}
+              {selectedUserId && (
+                <div>
+                  <SkillMappingView userId={selectedUserId} readOnly={true} />
+                </div>
+              )}
+
+              {!selectedUserId && !usersLoading && users.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    ユーザーが見つかりません
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

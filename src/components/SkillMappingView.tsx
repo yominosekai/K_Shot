@@ -7,9 +7,10 @@ import type { SkillPhaseItem, ProgressStatus } from '@/shared/lib/data-access/sk
 
 interface SkillMappingViewProps {
   userId: string;
+  readOnly?: boolean;
 }
 
-export default function SkillMappingView({ userId }: SkillMappingViewProps) {
+export default function SkillMappingView({ userId, readOnly = false }: SkillMappingViewProps) {
   const [items, setItems] = useState<SkillPhaseItem[]>([]);
   const [progress, setProgress] = useState<Map<number, ProgressStatus>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -273,11 +274,11 @@ export default function SkillMappingView({ userId }: SkillMappingViewProps) {
                         return (
                           <div
                             key={item.id}
-                            className={`mb-1 last:mb-0 p-2 rounded cursor-pointer transition-colors ${
+                            className={`mb-1 last:mb-0 p-2 rounded transition-colors ${
                               getStatusStyle(itemStatus)
-                            } ${isUpdating ? 'opacity-50 cursor-wait' : 'hover:opacity-80'}`}
-                            onClick={() => !isUpdating && cycleProgress(item.id)}
-                            title={`${item.name} - ${getStatusLabel(itemStatus)} (クリックで変更)`}
+                            } ${readOnly ? 'cursor-default' : isUpdating ? 'opacity-50 cursor-wait' : 'cursor-pointer hover:opacity-80'}`}
+                            onClick={() => !readOnly && !isUpdating && cycleProgress(item.id)}
+                            title={`${item.name} - ${getStatusLabel(itemStatus)}${readOnly ? '' : ' (クリックで変更)'}`}
                           >
                             <div className="text-xs font-medium">{item.name}</div>
                             {item.description && (
