@@ -1,7 +1,7 @@
 // ExcelエクスポートAPI
 
 import { NextRequest, NextResponse } from 'next/server';
-import * as XLSX from 'xlsx-js-style';
+import ExcelJS from 'exceljs';
 import { requireTraining } from '@/shared/lib/auth/middleware';
 import { getSkillPhaseItems } from '@/shared/lib/data-access/skill-mapping';
 import type { SkillPhaseItem } from '@/shared/lib/data-access/skill-mapping';
@@ -25,14 +25,29 @@ export async function GET(request: NextRequest) {
     const items = getSkillPhaseItems();
 
     // ワークブックを作成
-    const workbook = XLSX.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
 
     // ===== シート1: データ（フラット形式、編集用） =====
-    const dataWorksheetData = [
-      // ヘッダー行
-      ['順序', '大分類', '項目', '中分類', '小分類', 'スキルフェーズ', '取り組み名', '説明'],
-      // データ行
-      ...items.map(item => [
+    const dataWorksheet = workbook.addWorksheet('データ');
+    
+    // 列幅を設定
+    dataWorksheet.columns = [
+      { width: 8 },  // 順序
+      { width: 15 }, // 大分類
+      { width: 20 }, // 項目
+      { width: 20 }, // 中分類
+      { width: 15 }, // 小分類
+      { width: 12 }, // スキルフェーズ
+      { width: 30 }, // 取り組み名
+      { width: 40 }  // 説明
+    ];
+
+    // ヘッダー行を追加
+    dataWorksheet.addRow(['順序', '大分類', '項目', '中分類', '小分類', 'スキルフェーズ', '取り組み名', '説明']);
+    
+    // データ行を追加
+    items.forEach(item => {
+      dataWorksheet.addRow([
         item.displayOrder !== null && item.displayOrder !== undefined ? item.displayOrder : '',
         item.category,
         item.item,
@@ -41,21 +56,8 @@ export async function GET(request: NextRequest) {
         item.phase,
         item.name,
         item.description || ''
-      ])
-    ];
-
-    const dataWorksheet = XLSX.utils.aoa_to_sheet(dataWorksheetData);
-    dataWorksheet['!cols'] = [
-      { wch: 8 },  // 順序
-      { wch: 15 }, // 大分類
-      { wch: 20 }, // 項目
-      { wch: 20 }, // 中分類
-      { wch: 15 }, // 小分類
-      { wch: 12 }, // スキルフェーズ
-      { wch: 30 }, // 取り組み名
-      { wch: 40 }  // 説明
-    ];
-    XLSX.utils.book_append_sheet(workbook, dataWorksheet, 'データ');
+      ]);
+    });
 
     // ===== シート2: 表示（結合セル形式、確認用） =====
     // データを階層ごとにグループ化
@@ -68,6 +70,21 @@ export async function GET(request: NextRequest) {
       grouped[key].push(row);
     });
 
+    // 各グループ内でdisplayOrderでソート（念のため）
+    Object.keys(grouped).forEach(key => {
+      grouped[key].sort((a, b) => {
+        const aOrder = a.displayOrder ?? 999999;
+        const bOrder = b.displayOrder ?? 999999;
+        if (aOrder !== bOrder) {
+          return aOrder - bOrder;
+        }
+        if (a.phase !== b.phase) {
+          return a.phase - b.phase;
+        }
+        return a.smallCategory.localeCompare(b.smallCategory);
+      });
+    });
+
     // 大分類ごとにグループ化
     const categoryGroups: Record<string, string[]> = {};
     Object.keys(grouped).forEach(key => {
@@ -78,6 +95,29 @@ export async function GET(request: NextRequest) {
       categoryGroups[category].push(key);
     });
 
+    // 各カテゴリ内でdisplayOrderでソート
+    Object.keys(categoryGroups).forEach(category => {
+      categoryGroups[category].sort((keyA, keyB) => {
+        const groupA = grouped[keyA];
+        const groupB = grouped[keyB];
+        const orderA = groupA && groupA.length > 0 ? (groupA[0].displayOrder ?? 999999) : 999999;
+        const orderB = groupB && groupB.length > 0 ? (groupB[0].displayOrder ?? 999999) : 999999;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+        // displayOrderが同じ場合は項目名でソート
+        const [, itemA] = keyA.split('|');
+        const [, itemB] = keyB.split('|');
+        if (itemA !== itemB) {
+          return itemA.localeCompare(itemB);
+        }
+        // 項目名も同じ場合は中分類でソート
+        const [, , subCategoryA] = keyA.split('|');
+        const [, , subCategoryB] = keyB.split('|');
+        return subCategoryA.localeCompare(subCategoryB);
+      });
+    });
+
     // 表示用の行データを生成
     interface DisplayRow {
       displayOrder: number | null; // 順序番号（中分類行ごと）
@@ -86,6 +126,8 @@ export async function GET(request: NextRequest) {
       item: string | null;
       itemRowspan: number;
       subCategory: string;
+      originalCategory: string; // ソート後も参照できるように元の大分類を保持
+      originalItem: string; // ソート後も参照できるように元の項目を保持
       phase1: string;
       phase2: string;
       phase3: string;
@@ -183,6 +225,8 @@ export async function GET(request: NextRequest) {
             item: isFirstItemRow ? item : null,
             itemRowspan: isFirstItemRow ? itemRowspan : 0,
             subCategory: subCategory,
+            originalCategory: category, // 元の大分類を保持
+            originalItem: item, // 元の項目を保持
             phase1: phaseData[1],
             phase2: phaseData[2],
             phase3: phaseData[3],
@@ -196,14 +240,123 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    // 表示シートのデータを生成
-    const displayWorksheetData: (string | number)[][] = [
-      // ヘッダー行1
-      ['順序', '大分類', '項目', '中分類', 'スキルフェーズ', '', '', '', ''],
-      // ヘッダー行2
-      ['', '', '', '', '1', '2', '3', '4', '5'],
-      // データ行
-      ...displayRows.map(row => [
+    // displayOrderでソート（nullの場合は最後に配置）
+    displayRows.sort((a, b) => {
+      if (a.displayOrder === null && b.displayOrder === null) return 0;
+      if (a.displayOrder === null) return 1; // nullは最後
+      if (b.displayOrder === null) return -1; // nullは最後
+      return a.displayOrder - b.displayOrder;
+    });
+
+    // ソート後、大分類と項目の結合範囲を再計算
+    let currentCategory: string | null = null;
+    let currentCategoryStartIdx = -1;
+    let currentItem: string | null = null;
+    let currentItemStartIdx = -1;
+
+    displayRows.forEach((row, idx) => {
+      // 大分類の処理
+      if (row.originalCategory && row.originalCategory !== currentCategory) {
+        // 前の大分類のrowspanを設定
+        if (currentCategory !== null && currentCategoryStartIdx >= 0) {
+          const rowspan = idx - currentCategoryStartIdx;
+          if (rowspan > 0) {
+            displayRows[currentCategoryStartIdx].categoryRowspan = rowspan;
+          }
+        }
+        // 新しい大分類の開始
+        currentCategory = row.originalCategory;
+        currentCategoryStartIdx = idx;
+        row.category = row.originalCategory;
+        row.categoryRowspan = 1; // 一時的に1に設定
+      } else if (row.originalCategory === currentCategory) {
+        // 同じ大分類の続き
+        row.category = null;
+        row.categoryRowspan = 0;
+      } else {
+        // 大分類がない場合
+        row.category = null;
+        row.categoryRowspan = 0;
+      }
+
+      // 項目の処理（大分類内で）
+      // 大分類が変わった場合は項目もリセット
+      if (row.originalCategory !== currentCategory) {
+        if (currentItem !== null && currentItemStartIdx >= 0) {
+          // 前の項目のrowspanを設定
+          const rowspan = idx - currentItemStartIdx;
+          if (rowspan > 0) {
+            displayRows[currentItemStartIdx].itemRowspan = rowspan;
+          }
+        }
+        currentItem = null;
+        currentItemStartIdx = -1;
+      }
+
+      if (row.originalItem && row.originalItem !== currentItem && 
+          currentCategory === row.originalCategory) {
+        // 前の項目のrowspanを設定
+        if (currentItem !== null && currentItemStartIdx >= 0) {
+          const rowspan = idx - currentItemStartIdx;
+          if (rowspan > 0) {
+            displayRows[currentItemStartIdx].itemRowspan = rowspan;
+          }
+        }
+        // 新しい項目の開始
+        currentItem = row.originalItem;
+        currentItemStartIdx = idx;
+        row.item = row.originalItem;
+        row.itemRowspan = 1; // 一時的に1に設定
+      } else if (row.originalItem === currentItem && currentCategory === row.originalCategory) {
+        // 同じ項目の続き
+        row.item = null;
+        row.itemRowspan = 0;
+      } else {
+        // 項目がない場合
+        row.item = null;
+        row.itemRowspan = 0;
+      }
+    });
+
+    // 最後の大分類と項目のrowspanを設定
+    if (currentCategory !== null && currentCategoryStartIdx >= 0) {
+      const rowspan = displayRows.length - currentCategoryStartIdx;
+      if (rowspan > 0) {
+        displayRows[currentCategoryStartIdx].categoryRowspan = rowspan;
+      }
+    }
+    if (currentItem !== null && currentItemStartIdx >= 0) {
+      const rowspan = displayRows.length - currentItemStartIdx;
+      if (rowspan > 0) {
+        displayRows[currentItemStartIdx].itemRowspan = rowspan;
+      }
+    }
+
+    // ===== シート2: 表示（結合セル形式、確認用） =====
+    const displayWorksheet = workbook.addWorksheet('表示');
+    
+    // 列幅を設定
+    displayWorksheet.columns = [
+      { width: 8 },  // 順序
+      { width: 15 }, // 大分類
+      { width: 20 }, // 項目
+      { width: 20 }, // 中分類
+      { width: 30 }, // スキルフェーズ1
+      { width: 30 }, // スキルフェーズ2
+      { width: 30 }, // スキルフェーズ3
+      { width: 30 }, // スキルフェーズ4
+      { width: 30 }  // スキルフェーズ5
+    ];
+
+    // ヘッダー行1を追加
+    displayWorksheet.addRow(['順序', '大分類', '項目', '中分類', 'スキルフェーズ', '', '', '', '']);
+    
+    // ヘッダー行2を追加
+    displayWorksheet.addRow(['', '', '', '', '1', '2', '3', '4', '5']);
+    
+    // データ行を追加
+    displayRows.forEach(row => {
+      displayWorksheet.addRow([
         row.displayOrder !== null && row.displayOrder !== undefined ? row.displayOrder : '',
         row.category || '',
         row.item || '',
@@ -213,307 +366,219 @@ export async function GET(request: NextRequest) {
         row.phase3 || '',
         row.phase4 || '',
         row.phase5 || ''
-      ])
-    ];
+      ]);
+    });
 
-    const displayWorksheet = XLSX.utils.aoa_to_sheet(displayWorksheetData);
-
-    // 結合セルを設定
-    const merges: XLSX.Range[] = [];
-    
+    // 結合セルを設定（exceljsは1ベース）
     // ヘッダー行1の「順序」を結合（A1:A2）
-    merges.push({ s: { r: 0, c: 0 }, e: { r: 1, c: 0 } });
+    displayWorksheet.mergeCells(1, 1, 2, 1);
     // ヘッダー行1の「大分類」を結合（B1:B2）
-    merges.push({ s: { r: 0, c: 1 }, e: { r: 1, c: 1 } });
+    displayWorksheet.mergeCells(1, 2, 2, 2);
     // ヘッダー行1の「項目」を結合（C1:C2）
-    merges.push({ s: { r: 0, c: 2 }, e: { r: 1, c: 2 } });
+    displayWorksheet.mergeCells(1, 3, 2, 3);
     // ヘッダー行1の「中分類」を結合（D1:D2）
-    merges.push({ s: { r: 0, c: 3 }, e: { r: 1, c: 3 } });
+    displayWorksheet.mergeCells(1, 4, 2, 4);
     // ヘッダー行1の「スキルフェーズ」を結合（E1:I1）
-    merges.push({ s: { r: 0, c: 4 }, e: { r: 0, c: 8 } });
+    displayWorksheet.mergeCells(1, 5, 1, 9);
     
     // データ行の結合セルを設定
-    let currentRow = 2; // データ行は2行目から開始（0ベースなので2）
+    let currentRow = 3; // データ行は3行目から開始（exceljsは1ベース）
+    const mergedCells = new Set<string>(); // マージ済みセルを追跡
+    
     displayRows.forEach((row, idx) => {
       const rowIndex = currentRow + idx;
       
       // 順序の結合（同じ順序番号の行を結合）
       if (row.displayOrder !== null) {
-        // 同じ順序番号を持つ行を探す
         const sameOrderRows = displayRows.filter(r => r.displayOrder === row.displayOrder);
         if (sameOrderRows.length > 1) {
           const firstRowIndex = displayRows.findIndex(r => r.displayOrder === row.displayOrder);
           if (firstRowIndex === idx) {
-            merges.push({
-              s: { r: rowIndex, c: 0 },
-              e: { r: rowIndex + sameOrderRows.length - 1, c: 0 }
-            });
+            const mergeKey = `${rowIndex}:1:${rowIndex + sameOrderRows.length - 1}:1`;
+            if (!mergedCells.has(mergeKey)) {
+              try {
+                displayWorksheet.mergeCells(rowIndex, 1, rowIndex + sameOrderRows.length - 1, 1);
+                mergedCells.add(mergeKey);
+              } catch (error) {
+                // 既にマージされている場合はスキップ
+                console.warn(`順序の結合をスキップ: ${mergeKey}`, error);
+              }
+            }
           }
         } else {
           // 単独行の場合も結合（1行だけでも結合セルとして設定）
-          merges.push({
-            s: { r: rowIndex, c: 0 },
-            e: { r: rowIndex, c: 0 }
-          });
+          const mergeKey = `${rowIndex}:1:${rowIndex}:1`;
+          if (!mergedCells.has(mergeKey)) {
+            try {
+              displayWorksheet.mergeCells(rowIndex, 1, rowIndex, 1);
+              mergedCells.add(mergeKey);
+            } catch (error) {
+              // 既にマージされている場合はスキップ
+              console.warn(`順序の結合をスキップ: ${mergeKey}`, error);
+            }
+          }
         }
       }
       
-      // 大分類の結合
+      // 大分類の結合（最初の行のみ実行）
       if (row.category && row.categoryRowspan > 1) {
-        merges.push({
-          s: { r: rowIndex, c: 1 },
-          e: { r: rowIndex + row.categoryRowspan - 1, c: 1 }
-        });
+        const mergeKey = `${rowIndex}:2:${rowIndex + row.categoryRowspan - 1}:2`;
+        if (!mergedCells.has(mergeKey)) {
+          try {
+            displayWorksheet.mergeCells(rowIndex, 2, rowIndex + row.categoryRowspan - 1, 2);
+            mergedCells.add(mergeKey);
+          } catch (error) {
+            // 既にマージされている場合はスキップ
+            console.warn(`大分類の結合をスキップ: ${mergeKey}`, error);
+          }
+        }
       }
       
-      // 項目の結合
+      // 項目の結合（最初の行のみ実行）
       if (row.item && row.itemRowspan > 1) {
-        merges.push({
-          s: { r: rowIndex, c: 2 },
-          e: { r: rowIndex + row.itemRowspan - 1, c: 2 }
-        });
+        const mergeKey = `${rowIndex}:3:${rowIndex + row.itemRowspan - 1}:3`;
+        if (!mergedCells.has(mergeKey)) {
+          try {
+            displayWorksheet.mergeCells(rowIndex, 3, rowIndex + row.itemRowspan - 1, 3);
+            mergedCells.add(mergeKey);
+          } catch (error) {
+            // 既にマージされている場合はスキップ
+            console.warn(`項目の結合をスキップ: ${mergeKey}`, error);
+          }
+        }
       }
     });
 
-    displayWorksheet['!merges'] = merges;
-
-    // 列幅を設定
-    displayWorksheet['!cols'] = [
-      { wch: 8 },  // 順序
-      { wch: 15 }, // 大分類
-      { wch: 20 }, // 項目
-      { wch: 20 }, // 中分類
-      { wch: 30 }, // スキルフェーズ1
-      { wch: 30 }, // スキルフェーズ2
-      { wch: 30 }, // スキルフェーズ3
-      { wch: 30 }, // スキルフェーズ4
-      { wch: 30 }  // スキルフェーズ5
-    ];
-
     // スタイリングを適用
-    const range = XLSX.utils.decode_range(displayWorksheet['!ref'] || 'A1');
-    
-    // ヘッダー行のスタイル
-    // 結合セルの罫線を正しく表示するため、結合セルの範囲全体に罫線を設定
-    const borderStyle = {
-      top: { style: 'thin' as const, color: { rgb: '000000' } },
-      bottom: { style: 'thin' as const, color: { rgb: '000000' } },
-      left: { style: 'thin' as const, color: { rgb: '000000' } },
-      right: { style: 'thin' as const, color: { rgb: '000000' } }
+    const borderStyle: Partial<ExcelJS.Border> = {
+      style: 'thin',
+      color: { argb: 'FF000000' }
     };
     
-    // ヘッダー行1: 順序（A1:A2結合）
-    const cellA1 = displayWorksheet['A1'] || { t: 's', v: '順序' };
-    cellA1.s = {
-      fill: { fgColor: { rgb: 'FFE6CC' } },
-      font: { bold: true, color: { rgb: '000000' }, sz: 11 },
-      alignment: { horizontal: 'center' as const, vertical: 'center' as const },
-      border: borderStyle
-    };
-    displayWorksheet['A1'] = cellA1;
+    // ヘッダー行1のスタイル設定
+    const header1Cells = [
+      { row: 1, col: 1, value: '順序' },
+      { row: 1, col: 2, value: '大分類' },
+      { row: 1, col: 3, value: '項目' },
+      { row: 1, col: 4, value: '中分類' },
+      { row: 1, col: 5, value: 'スキルフェーズ' }
+    ];
     
-    // ヘッダー行1: 大分類（B1:B2結合）
-    const cellB1 = displayWorksheet['B1'] || { t: 's', v: '大分類' };
-    cellB1.s = {
-      fill: { fgColor: { rgb: 'FFE6CC' } },
-      font: { bold: true, color: { rgb: '000000' }, sz: 11 },
-      alignment: { horizontal: 'center' as const, vertical: 'center' as const },
-      border: borderStyle
-    };
-    displayWorksheet['B1'] = cellB1;
-    
-    // ヘッダー行1: 項目（C1:C2結合）
-    const cellC1 = displayWorksheet['C1'] || { t: 's', v: '項目' };
-    cellC1.s = {
-      fill: { fgColor: { rgb: 'FFE6CC' } },
-      font: { bold: true, color: { rgb: '000000' }, sz: 11 },
-      alignment: { horizontal: 'center' as const, vertical: 'center' as const },
-      border: borderStyle
-    };
-    displayWorksheet['C1'] = cellC1;
-    
-    // ヘッダー行1: 中分類（D1:D2結合）
-    const cellD1 = displayWorksheet['D1'] || { t: 's', v: '中分類' };
-    cellD1.s = {
-      fill: { fgColor: { rgb: 'FFE6CC' } },
-      font: { bold: true, color: { rgb: '000000' }, sz: 11 },
-      alignment: { horizontal: 'center' as const, vertical: 'center' as const },
-      border: borderStyle
-    };
-    displayWorksheet['D1'] = cellD1;
-    
-    // ヘッダー行1: スキルフェーズ（E1:I1結合）
-    const cellE1 = displayWorksheet['E1'] || { t: 's', v: 'スキルフェーズ' };
-    cellE1.s = {
-      fill: { fgColor: { rgb: 'FFE6CC' } },
-      font: { bold: true, color: { rgb: '000000' }, sz: 11 },
-      alignment: { horizontal: 'center' as const, vertical: 'center' as const },
-      border: borderStyle
-    };
-    displayWorksheet['E1'] = cellE1;
-    
-    // 結合セルの右端（I1）にも罫線を設定
-    const cellI1 = displayWorksheet['I1'] || { t: 's', v: '' };
-    cellI1.s = {
-      fill: { fgColor: { rgb: 'FFE6CC' } },
-      border: {
-        top: { style: 'thin' as const, color: { rgb: '000000' } },
-        bottom: { style: 'thin' as const, color: { rgb: '000000' } },
-        left: { style: 'thin' as const, color: { rgb: '000000' } },
-        right: { style: 'thin' as const, color: { rgb: '000000' } }
-      }
-    };
-    displayWorksheet['I1'] = cellI1;
-    
-    // ヘッダー行2: スキルフェーズ1～5（E2:I2）
-    for (let c = 4; c <= 8; c++) {
-      const cellAddress = XLSX.utils.encode_cell({ r: 1, c });
-      const cell = displayWorksheet[cellAddress] || { t: 's', v: String(c - 3) };
-      cell.s = {
-        fill: { fgColor: { rgb: 'FFE6CC' } },
-        font: { bold: true, color: { rgb: '000000' }, sz: 11 },
-        alignment: { horizontal: 'center' as const, vertical: 'center' as const },
-        border: borderStyle
+    header1Cells.forEach(({ row, col, value }) => {
+      const cell = displayWorksheet.getCell(row, col);
+      cell.value = value;
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFE6CC' }
       };
-      displayWorksheet[cellAddress] = cell;
-    }
-    
-    // I2セルにも右側の罫線を確実に設定
-    const cellI2 = displayWorksheet['I2'] || { t: 's', v: '5' };
-    if (!cellI2.s) {
-      cellI2.s = {
-        fill: { fgColor: { rgb: 'FFE6CC' } },
-        font: { bold: true, color: { rgb: '000000' }, sz: 11 },
-        alignment: { horizontal: 'center' as const, vertical: 'center' as const },
-        border: borderStyle
+      cell.font = { bold: true, size: 11 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: borderStyle,
+        bottom: borderStyle,
+        left: borderStyle,
+        right: borderStyle
       };
-    } else {
-      // 既存のスタイルがある場合は、右側の罫線を確実に設定
-      cellI2.s.border = {
-        ...cellI2.s.border,
-        right: { style: 'thin' as const, color: { rgb: '000000' } }
+    });
+    
+    // ヘッダー行2のスタイル設定（スキルフェーズ1～5）
+    for (let col = 5; col <= 9; col++) {
+      const cell = displayWorksheet.getCell(2, col);
+      cell.value = String(col - 4);
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFE6CC' }
+      };
+      cell.font = { bold: true, size: 11 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: borderStyle,
+        bottom: borderStyle,
+        left: borderStyle,
+        right: borderStyle
       };
     }
-    displayWorksheet['I2'] = cellI2;
     
-    // 結合セル内のセル（A2, B2, C2, D2）にも罫線を設定（結合セルの境界を維持）
-    const cellA2 = displayWorksheet['A2'] || { t: 's', v: '' };
-    cellA2.s = {
-      fill: { fgColor: { rgb: 'FFE6CC' } },
-      border: {
-        top: { style: 'thin' as const, color: { rgb: '000000' } },
-        bottom: { style: 'thin' as const, color: { rgb: '000000' } },
-        left: { style: 'thin' as const, color: { rgb: '000000' } },
-        right: { style: 'thin' as const, color: { rgb: '000000' } }
-      }
-    };
-    displayWorksheet['A2'] = cellA2;
-    
-    const cellB2 = displayWorksheet['B2'] || { t: 's', v: '' };
-    cellB2.s = {
-      fill: { fgColor: { rgb: 'FFE6CC' } },
-      border: {
-        top: { style: 'thin' as const, color: { rgb: '000000' } },
-        bottom: { style: 'thin' as const, color: { rgb: '000000' } },
-        left: { style: 'thin' as const, color: { rgb: '000000' } },
-        right: { style: 'thin' as const, color: { rgb: '000000' } }
-      }
-    };
-    displayWorksheet['B2'] = cellB2;
-    
-    const cellC2 = displayWorksheet['C2'] || { t: 's', v: '' };
-    cellC2.s = {
-      fill: { fgColor: { rgb: 'FFE6CC' } },
-      border: {
-        top: { style: 'thin' as const, color: { rgb: '000000' } },
-        bottom: { style: 'thin' as const, color: { rgb: '000000' } },
-        left: { style: 'thin' as const, color: { rgb: '000000' } },
-        right: { style: 'thin' as const, color: { rgb: '000000' } }
-      }
-    };
-    displayWorksheet['C2'] = cellC2;
-    
-    // データ行のスタイル
-    for (let r = 2; r <= range.e.r; r++) {
-      for (let c = 0; c <= range.e.c; c++) {
-        const cellAddress = XLSX.utils.encode_cell({ r, c });
-        if (!displayWorksheet[cellAddress]) {
-          displayWorksheet[cellAddress] = { t: 's', v: '' };
-        }
-        
-        const cell = displayWorksheet[cellAddress];
-        const row = displayRows[r - 2]; // データ行のインデックス
-        
-        // 共通の枠線スタイル
-        const borderStyle = {
-          top: { style: 'thin' as const, color: { rgb: '000000' } },
-          bottom: { style: 'thin' as const, color: { rgb: '000000' } },
-          left: { style: 'thin' as const, color: { rgb: '000000' } },
-          right: { style: 'thin' as const, color: { rgb: '000000' } }
+    // データ行のスタイル設定
+    displayRows.forEach((row, idx) => {
+      const rowIndex = 3 + idx; // データ行は3行目から（exceljsは1ベース）
+      
+      // 順序列（中央揃え、枠線）
+      const cell0 = displayWorksheet.getCell(rowIndex, 1);
+      cell0.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell0.font = { size: 10 };
+      cell0.border = {
+        top: borderStyle,
+        bottom: borderStyle,
+        left: borderStyle,
+        right: borderStyle
+      };
+      
+      // 大分類列（中央揃え、グレー背景、太字、枠線）
+      const cell1 = displayWorksheet.getCell(rowIndex, 2);
+      if (row.category) {
+        cell1.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF0F0F0' }
         };
-        
-        if (row) {
-          // 順序列（中央揃え、枠線）
-          if (c === 0) {
-            cell.s = {
-              font: { color: { rgb: '000000' }, sz: 10 },
-              alignment: { horizontal: 'center' as const, vertical: 'center' as const },
-              border: borderStyle
-            };
-          }
-          // 大分類列（中央揃え、グレー背景、太字、枠線）
-          else if (c === 1) {
-            cell.s = {
-              fill: { fgColor: { rgb: 'F0F0F0' } }, // グレー
-              font: { bold: true, color: { rgb: '000000' }, sz: 10 },
-              alignment: { horizontal: 'center' as const, vertical: 'center' as const },
-              border: borderStyle
-            };
-          }
-          // 項目列（左揃え、薄いグレー背景、枠線）
-          else if (c === 2) {
-            cell.s = {
-              fill: { fgColor: { rgb: 'FAFAFA' } }, // 薄いグレー
-              font: { color: { rgb: '000000' }, sz: 10 },
-              alignment: { horizontal: 'left' as const, vertical: 'center' as const },
-              border: borderStyle
-            };
-          }
-          // 中分類列（左揃え、枠線）
-          else if (c === 3) {
-            cell.s = {
-              font: { color: { rgb: '000000' }, sz: 10 },
-              alignment: { horizontal: 'left' as const, vertical: 'center' as const },
-              border: borderStyle
-            };
-          }
-          // スキルフェーズ列（上揃え、枠線、折り返し表示）
-          else if (c >= 4) {
-            cell.s = {
-              font: { color: { rgb: '000000' }, sz: 9 },
-              alignment: { horizontal: 'left' as const, vertical: 'top' as const, wrapText: true },
-              border: borderStyle
-            };
-          }
-        } else {
-          // 行データがない場合も枠線を適用
-          cell.s = {
-            border: borderStyle
-          };
-        }
+        cell1.font = { bold: true, size: 10 };
       }
-    }
-
-    // 印刷範囲を設定（描画されているデータ範囲全体）
-    const displayRange = displayWorksheet['!ref'];
-    if (displayRange) {
-      displayWorksheet['!printArea'] = displayRange;
-    }
-    
-    XLSX.utils.book_append_sheet(workbook, displayWorksheet, '表示');
+      cell1.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell1.border = {
+        top: borderStyle,
+        bottom: borderStyle,
+        left: borderStyle,
+        right: borderStyle
+      };
+      
+      // 項目列（左揃え、薄いグレー背景、枠線）
+      const cell2 = displayWorksheet.getCell(rowIndex, 3);
+      if (row.item) {
+        cell2.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFAFAFA' }
+        };
+      }
+      cell2.alignment = { horizontal: 'left', vertical: 'middle' };
+      cell2.font = { size: 10 };
+      cell2.border = {
+        top: borderStyle,
+        bottom: borderStyle,
+        left: borderStyle,
+        right: borderStyle
+      };
+      
+      // 中分類列（左揃え、枠線）
+      const cell3 = displayWorksheet.getCell(rowIndex, 4);
+      cell3.alignment = { horizontal: 'left', vertical: 'middle' };
+      cell3.font = { size: 10 };
+      cell3.border = {
+        top: borderStyle,
+        bottom: borderStyle,
+        left: borderStyle,
+        right: borderStyle
+      };
+      
+      // スキルフェーズ列（上揃え、枠線、折り返し表示）
+      for (let col = 5; col <= 9; col++) {
+        const cell = displayWorksheet.getCell(rowIndex, col);
+        cell.alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
+        cell.font = { size: 9 };
+        cell.border = {
+          top: borderStyle,
+          bottom: borderStyle,
+          left: borderStyle,
+          right: borderStyle
+        };
+      }
+    });
 
     // Excelファイルを生成
-    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    const excelBuffer = await workbook.xlsx.writeBuffer();
 
     // ファイル名に日時を含める
     const now = new Date();

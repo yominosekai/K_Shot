@@ -1,7 +1,7 @@
 // Excelインポート実行API
 
 import { NextRequest, NextResponse } from 'next/server';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { requireTraining } from '@/shared/lib/auth/middleware';
 import { getDatabase } from '@/shared/lib/database/db';
 
@@ -33,21 +33,20 @@ export async function POST(request: NextRequest) {
 
     // ファイルをバッファに変換
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
 
     // Excelファイルを読み込む
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(arrayBuffer);
 
     // シート名を決定
     const sheetName = importType === 'display' ? '表示' : 'データ';
-    if (!workbook.SheetNames.includes(sheetName)) {
+    const worksheet = workbook.getWorksheet(sheetName);
+    if (!worksheet) {
       return NextResponse.json(
         { success: false, error: `「${sheetName}」シートが見つかりません。エクスポートしたファイルをそのまま使用してください。` },
         { status: 400 }
       );
     }
-
-    const worksheet = workbook.Sheets[sheetName];
 
     let jsonData: Array<{
       category: string;
@@ -62,30 +61,43 @@ export async function POST(request: NextRequest) {
 
     if (importType === 'display') {
       // 「表示」シートからのインポート
-      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+      const dimensions = worksheet.dimensions;
+      if (!dimensions) {
+        return NextResponse.json(
+          { success: false, error: 'シートにデータがありません' },
+          { status: 400 }
+        );
+      }
       
       // 結合セルの情報を取得
-      const merges = worksheet['!merges'] || [];
       const mergeMap = new Map<string, { r: number; c: number }>();
-      merges.forEach((merge: XLSX.Range) => {
-        for (let r = merge.s.r; r <= merge.e.r; r++) {
-          for (let c = merge.s.c; c <= merge.e.c; c++) {
+      const merges = (worksheet.model.merges as unknown) as Array<{ top: number; bottom: number; left: number; right: number }> | undefined;
+      merges?.forEach((merge) => {
+        const startRow = merge.top - 1; // exceljsは1ベース、0ベースに変換
+        const endRow = merge.bottom - 1;
+        const startCol = merge.left - 1;
+        const endCol = merge.right - 1;
+        for (let r = startRow; r <= endRow; r++) {
+          for (let c = startCol; c <= endCol; c++) {
             const key = `${r},${c}`;
-            mergeMap.set(key, { r: merge.s.r, c: merge.s.c });
+            mergeMap.set(key, { r: startRow, c: startCol });
           }
         }
       });
 
       // データ行を読み込む（2行目以降、ヘッダー行をスキップ）
-      for (let r = 2; r <= range.e.r; r++) {
+      const maxRow = dimensions.bottom;
+      for (let r = 2; r <= maxRow; r++) {
         const getCellValue = (row: number, col: number): string => {
           const mergeKey = `${row},${col}`;
           const mergeInfo = mergeMap.get(mergeKey);
-          const actualRow = mergeInfo ? mergeInfo.r : row;
-          const actualCol = mergeInfo ? mergeInfo.c : col;
-          const cellAddress = XLSX.utils.encode_cell({ r: actualRow, c: actualCol });
-          const cell = worksheet[cellAddress];
-          return cell && cell.v ? String(cell.v) : '';
+          const actualRow = mergeInfo ? mergeInfo.r + 1 : row + 1; // exceljsは1ベース
+          const actualCol = mergeInfo ? mergeInfo.c + 1 : col + 1;
+          const cell = worksheet.getCell(actualRow, actualCol);
+          if (cell.value !== null && cell.value !== undefined) {
+            return String(cell.value);
+          }
+          return '';
         };
 
         // 順序番号を取得（A列）
@@ -145,10 +157,16 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // 「データ」シートからのインポート
-      const allData = XLSX.utils.sheet_to_json(worksheet, {
-        header: ['displayOrder', 'category', 'item', 'subCategory', 'smallCategory', 'phase', 'name', 'description'],
-        defval: '',
-      }) as Array<{
+      const dimensions = worksheet.dimensions;
+      if (!dimensions) {
+        return NextResponse.json(
+          { success: false, error: 'シートにデータがありません' },
+          { status: 400 }
+        );
+      }
+
+      // ヘッダー行をスキップしてデータ行を読み込む（2行目から）
+      const allData: Array<{
         displayOrder?: number | string;
         category: string;
         item: string;
@@ -157,10 +175,43 @@ export async function POST(request: NextRequest) {
         phase: number | string;
         name: string;
         description: string;
-      }>;
+      }> = [];
 
-      // 1行目（ヘッダー行）を除外してデータのみを取得
-      jsonData = allData.slice(1).map(row => {
+      for (let r = 2; r <= dimensions.bottom; r++) {
+        const row: any = {
+          displayOrder: '',
+          category: '',
+          item: '',
+          subCategory: '',
+          smallCategory: '',
+          phase: '',
+          name: '',
+          description: ''
+        };
+
+        const cell1 = worksheet.getCell(r, 1); // 順序
+        const cell2 = worksheet.getCell(r, 2); // 大分類
+        const cell3 = worksheet.getCell(r, 3); // 項目
+        const cell4 = worksheet.getCell(r, 4); // 中分類
+        const cell5 = worksheet.getCell(r, 5); // 小分類
+        const cell6 = worksheet.getCell(r, 6); // スキルフェーズ
+        const cell7 = worksheet.getCell(r, 7); // 取り組み名
+        const cell8 = worksheet.getCell(r, 8); // 説明
+
+        row.displayOrder = cell1.value !== null && cell1.value !== undefined ? String(cell1.value) : '';
+        row.category = cell2.value !== null && cell2.value !== undefined ? String(cell2.value) : '';
+        row.item = cell3.value !== null && cell3.value !== undefined ? String(cell3.value) : '';
+        row.subCategory = cell4.value !== null && cell4.value !== undefined ? String(cell4.value) : '';
+        row.smallCategory = cell5.value !== null && cell5.value !== undefined ? String(cell5.value) : '';
+        row.phase = cell6.value !== null && cell6.value !== undefined ? cell6.value : '';
+        row.name = cell7.value !== null && cell7.value !== undefined ? String(cell7.value) : '';
+        row.description = cell8.value !== null && cell8.value !== undefined ? String(cell8.value) : '';
+
+        allData.push(row);
+      }
+
+      // データを変換
+      jsonData = allData.map(row => {
         let displayOrder: number | undefined = undefined;
         if (row.displayOrder !== undefined && row.displayOrder !== '') {
           const parsed = typeof row.displayOrder === 'number' 
@@ -346,4 +397,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

@@ -8,14 +8,17 @@ import type { SkillPhaseItem, ProgressStatus } from '@/shared/lib/data-access/sk
 interface SkillMappingViewProps {
   userId: string;
   readOnly?: boolean;
+  onHasChangesChange?: (hasChanges: boolean) => void;
 }
 
-export default function SkillMappingView({ userId, readOnly = false }: SkillMappingViewProps) {
+export default function SkillMappingView({ userId, readOnly = false, onHasChangesChange }: SkillMappingViewProps) {
   const [items, setItems] = useState<SkillPhaseItem[]>([]);
   const [progress, setProgress] = useState<Map<number, ProgressStatus>>(new Map());
+  const [localProgress, setLocalProgress] = useState<Map<number, ProgressStatus>>(new Map()); // ローカルの変更を保持
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [updating, setUpdating] = useState<Set<number>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false); // 変更があるかどうか
 
   // スキルマスタと進捗データを取得
   useEffect(() => {
@@ -52,6 +55,9 @@ export default function SkillMappingView({ userId, readOnly = false }: SkillMapp
           progressMap.set(p.skillPhaseItemId, p.status);
         });
         setProgress(progressMap);
+        setLocalProgress(new Map(progressMap)); // ローカル状態も初期化
+        setHasChanges(false); // 変更フラグをリセット
+        onHasChangesChange?.(false); // 親に通知
       } catch (err) {
         console.error('データ取得エラー:', err);
         setError(err instanceof Error ? err.message : 'データの取得に失敗しました');
@@ -65,65 +71,89 @@ export default function SkillMappingView({ userId, readOnly = false }: SkillMapp
     }
   }, [userId]);
 
-  // 進捗状態を循環させる
-  const cycleProgress = async (itemId: number) => {
-    if (updating.has(itemId)) {
-      return; // 更新中は無視
+  // 進捗状態を循環させる（ローカルのみ更新）
+  const cycleProgress = (itemId: number) => {
+    if (readOnly || saving) {
+      return;
+    }
+
+    const currentStatus = localProgress.get(itemId) || 'not_started';
+    let nextStatus: ProgressStatus;
+
+    // 履修予定 → 進行中 → 完了 → 履修予定
+    switch (currentStatus) {
+      case 'not_started':
+        nextStatus = 'in_progress';
+        break;
+      case 'in_progress':
+        nextStatus = 'completed';
+        break;
+      case 'completed':
+        nextStatus = 'not_started';
+        break;
+      default:
+        nextStatus = 'not_started';
+    }
+
+    // ローカル状態を更新
+    setLocalProgress((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(itemId, nextStatus);
+      return newMap;
+    });
+    setHasChanges(true); // 変更フラグを立てる
+    onHasChangesChange?.(true); // 親に通知
+  };
+
+  // 保存処理
+  const handleSave = async () => {
+    if (readOnly || saving || !hasChanges) {
+      return;
     }
 
     try {
-      setUpdating((prev) => new Set(prev).add(itemId));
+      setSaving(true);
+      setError(null);
 
-      const currentStatus = progress.get(itemId) || 'not_started';
-      let nextStatus: ProgressStatus;
-
-      // 履修予定 → 進行中 → 完了 → 履修予定
-      switch (currentStatus) {
-        case 'not_started':
-          nextStatus = 'in_progress';
-          break;
-        case 'in_progress':
-          nextStatus = 'completed';
-          break;
-        case 'completed':
-          nextStatus = 'not_started';
-          break;
-        default:
-          nextStatus = 'not_started';
-      }
-
-      // APIで更新
-      const response = await fetch('/api/skill-mapping/progress', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          skillPhaseItemId: itemId,
-          status: nextStatus,
-        }),
+      // 変更された項目のみを取得
+      const changes: Array<{ skillPhaseItemId: number; status: ProgressStatus }> = [];
+      localProgress.forEach((status, itemId) => {
+        const originalStatus = progress.get(itemId) || 'not_started';
+        if (status !== originalStatus) {
+          changes.push({ skillPhaseItemId: itemId, status });
+        }
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || '進捗の更新に失敗しました');
+      if (changes.length === 0) {
+        setHasChanges(false);
+        return;
       }
 
-      // ローカル状態を更新
-      setProgress((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(itemId, nextStatus);
-        return newMap;
-      });
+      // 各変更をAPIで更新
+      for (const change of changes) {
+        const response = await fetch('/api/skill-mapping/progress', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(change),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || '進捗の更新に失敗しました');
+        }
+      }
+
+      // サーバー側の状態をローカル状態に反映
+      setProgress(new Map(localProgress));
+      setHasChanges(false);
+      onHasChangesChange?.(false); // 親に通知
     } catch (err) {
-      console.error('進捗更新エラー:', err);
-      alert(err instanceof Error ? err.message : '進捗の更新に失敗しました');
+      console.error('保存エラー:', err);
+      setError(err instanceof Error ? err.message : '保存に失敗しました');
     } finally {
-      setUpdating((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(itemId);
-        return newSet;
-      });
+      setSaving(false);
     }
   };
 
@@ -131,10 +161,13 @@ export default function SkillMappingView({ userId, readOnly = false }: SkillMapp
   const getStatusStyle = (status: ProgressStatus | undefined) => {
     switch (status) {
       case 'in_progress':
+        // 履修予定 = 黄色
         return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
       case 'completed':
+        // 履修済み = 緑
         return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200';
       default:
+        // 未選択 = グレー
         return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
     }
   };
@@ -143,11 +176,11 @@ export default function SkillMappingView({ userId, readOnly = false }: SkillMapp
   const getStatusLabel = (status: ProgressStatus | undefined) => {
     switch (status) {
       case 'in_progress':
-        return '進行中';
-      case 'completed':
-        return '完了';
-      default:
         return '履修予定';
+      case 'completed':
+        return '履修済み';
+      default:
+        return '未選択';
     }
   };
 
@@ -204,6 +237,48 @@ export default function SkillMappingView({ userId, readOnly = false }: SkillMapp
 
   return (
     <div className="p-4">
+      {/* ヘッダー：凡例と保存ボタン */}
+      {!readOnly && (
+        <div className="mb-4 flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <div className="flex items-center space-x-4">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">凡例:</span>
+            {/* 未選択（グレー） */}
+            <div className={`px-4 py-2 rounded-lg ${getStatusStyle('not_started')}`}>
+              未選択
+            </div>
+            {/* 履修予定（黄色） */}
+            <div className={`px-4 py-2 rounded-lg ${getStatusStyle('in_progress')}`}>
+              履修予定
+            </div>
+            {/* 履修済み（緑） */}
+            <div className={`px-4 py-2 rounded-lg ${getStatusStyle('completed')}`}>
+              履修済み
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
+            {hasChanges && (
+              <div className="flex items-center space-x-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 rounded-lg">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-semibold text-red-700 dark:text-red-300">編集中</span>
+              </div>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={saving || !hasChanges}
+              className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg">
+          {error}
+        </div>
+      )}
+
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse border border-gray-300 dark:border-gray-600">
@@ -258,26 +333,21 @@ export default function SkillMappingView({ userId, readOnly = false }: SkillMapp
                     );
                   }
 
-                  // フェーズ内の最初の項目の進捗状態を使用（複数項目がある場合は最初のもの）
-                  const firstItem = phaseItems[0];
-                  const status = progress.get(firstItem.id);
-
                   return (
                     <td
                       key={phase}
                       className="border border-gray-300 dark:border-gray-600 p-2"
                     >
                       {phaseItems.map((item) => {
-                        const itemStatus = progress.get(item.id);
-                        const isUpdating = updating.has(item.id);
+                        const itemStatus = localProgress.get(item.id); // ローカル状態を使用
 
                         return (
                           <div
                             key={item.id}
                             className={`mb-1 last:mb-0 p-2 rounded transition-colors ${
                               getStatusStyle(itemStatus)
-                            } ${readOnly ? 'cursor-default' : isUpdating ? 'opacity-50 cursor-wait' : 'cursor-pointer hover:opacity-80'}`}
-                            onClick={() => !readOnly && !isUpdating && cycleProgress(item.id)}
+                            } ${readOnly ? 'cursor-default' : saving ? 'opacity-50 cursor-wait' : 'cursor-pointer hover:opacity-80'}`}
+                            onClick={() => !readOnly && !saving && cycleProgress(item.id)}
                             title={`${item.name} - ${getStatusLabel(itemStatus)}${readOnly ? '' : ' (クリックで変更)'}`}
                           >
                             <div className="text-xs font-medium">{item.name}</div>

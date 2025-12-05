@@ -2,8 +2,9 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Maximize2, Minimize2 } from 'lucide-react';
+import { useConfirmDialog } from '@/contexts/ConfirmDialogContext';
 import SkillMappingView from './SkillMappingView';
 
 interface SkillMappingModalProps {
@@ -18,25 +19,46 @@ export default function SkillMappingModal({
   userId,
 }: SkillMappingModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const confirmDialog = useConfirmDialog();
+
+  // 閉じる処理（変更がある場合は確認）
+  const handleClose = useCallback(async () => {
+    if (hasChanges) {
+      const confirmed = await confirmDialog({
+        title: '変更が保存されていません',
+        message: '編集中の変更が保存されていません。閉じてもよろしいですか？',
+        confirmText: '閉じる',
+        cancelText: 'キャンセル',
+        variant: 'danger',
+      });
+      if (!confirmed) {
+        return;
+      }
+    }
+    onClose();
+  }, [hasChanges, confirmDialog, onClose]);
 
   // ESCキーで閉じる
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleEscape = (e: KeyboardEvent) => {
+    const handleEscape = async (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        e.preventDefault();
+        await handleClose();
       }
     };
 
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+  }, [isOpen, handleClose]);
 
-  // モーダルが閉じられたら最大化状態をリセット
+  // モーダルが閉じられたら最大化状態と変更フラグをリセット
   useEffect(() => {
     if (!isOpen) {
       setIsMaximized(false);
+      setHasChanges(false);
     }
   }, [isOpen]);
 
@@ -49,7 +71,7 @@ export default function SkillMappingModal({
       className={`fixed inset-0 z-[60] flex items-center justify-center ${
         isMaximized ? 'p-0' : 'p-4'
       } bg-black bg-opacity-50`}
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl flex flex-col ${
@@ -79,7 +101,7 @@ export default function SkillMappingModal({
             </button>
             {/* 閉じるボタン */}
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               aria-label="閉じる"
             >
@@ -90,7 +112,7 @@ export default function SkillMappingModal({
 
         {/* コンテンツ */}
         <div className="flex-1 overflow-auto">
-          <SkillMappingView userId={userId} />
+          <SkillMappingView userId={userId} onHasChangesChange={setHasChanges} />
         </div>
       </div>
     </div>
