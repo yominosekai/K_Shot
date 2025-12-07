@@ -11,6 +11,7 @@ import ContextMenu from '@/components/ContextMenu';
 import MaterialCreationModal from '@/components/MaterialCreationModal';
 import NotificationSendModal from '@/components/NotificationSendModal';
 import MaterialInfoModal from '@/components/MaterialInfoModal';
+import SkillMappingSelectionModal from '@/components/SkillMappingSelectionModal';
 import type { MaterialNormalized } from '@/features/materials/types';
 import { useMaterialsPage } from '@/shared/hooks/useMaterialsPage';
 import { useCategories } from '@/contexts/CategoriesContext';
@@ -22,6 +23,8 @@ import { useFavoritesToast } from './hooks/useFavoritesToast';
 
 export default function FavoritesPage() {
   const [localSearch, setLocalSearch] = useState('');
+  const [isSkillMappingModalOpen, setIsSkillMappingModalOpen] = useState(false);
+  const [selectedMaterialForSkillMapping, setSelectedMaterialForSkillMapping] = useState<MaterialNormalized | null>(null);
   
   const { categories } = useCategories();
   
@@ -59,6 +62,20 @@ export default function FavoritesPage() {
     bookmarks,
   });
 
+  // スキルマップ関連付けの処理
+  const handleLinkToSkillMapping = (material: MaterialNormalized) => {
+    setSelectedMaterialForSkillMapping(material);
+    setIsSkillMappingModalOpen(true);
+  };
+
+  const handleSkillMappingLinkToggle = (skillPhaseItemId: number, linked: boolean) => {
+    if (linked) {
+      toast.showToast('スキルマップに関連付けました');
+    } else {
+      toast.showToast('スキルマップとの関連付けを解除しました');
+    }
+  };
+
   // コンテキストメニュー管理
   const contextMenu = useFavoritesContextMenu({
     showToast: toast.showToast,
@@ -75,6 +92,7 @@ export default function FavoritesPage() {
       }
     },
     onCleanup: cleanup.handleCleanup,
+    onLinkToSkillMapping: handleLinkToSkillMapping,
   });
 
   // 初回にお気に入りフィルターを適用
@@ -312,6 +330,20 @@ export default function FavoritesPage() {
         onClose={modals.closeInfoModal}
         material={modals.infoMaterial}
       />
+
+      {/* スキルマップ選択モーダル */}
+      {selectedMaterialForSkillMapping && (
+        <SkillMappingSelectionModal
+          isOpen={isSkillMappingModalOpen}
+          onClose={() => {
+            setIsSkillMappingModalOpen(false);
+            setSelectedMaterialForSkillMapping(null);
+          }}
+          materialId={selectedMaterialForSkillMapping.id}
+          materialTitle={selectedMaterialForSkillMapping.title}
+          onLinkToggle={handleSkillMappingLinkToggle}
+        />
+      )}
 
       <Toast
         message={toast.toastMessage}

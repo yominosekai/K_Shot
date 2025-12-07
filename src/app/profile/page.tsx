@@ -318,6 +318,8 @@ export default function ProfilePage() {
             isOpen={isSkillMappingModalOpen}
             onClose={() => setIsSkillMappingModalOpen(false)}
             userId={user.id}
+            readOnly={true}
+            allowUnlink={false}
           />
         )}
       </div>

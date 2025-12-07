@@ -3,9 +3,11 @@
 'use client';
 
 import { useCallback } from 'react';
-import { Download, FileEdit, Copy, Move, Info, Bell, Trash2, Edit, Plus, FolderPlus } from 'lucide-react';
+import { Download, FileEdit, Copy, Move, Info, Bell, Trash2, Edit, Plus, FolderPlus, Link } from 'lucide-react';
 import type { ContextMenuItem } from '@/components/ContextMenu';
 import type { MaterialNormalized, FolderNormalized } from '@/features/materials/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { checkPermission } from '@/features/auth/utils';
 
 interface UseMaterialContextMenuProps {
   currentPath: string;
@@ -23,6 +25,7 @@ interface UseMaterialContextMenuProps {
   onDownloadMaterial: (material: MaterialNormalized) => Promise<void>;
   onRenameFolder: (folder: FolderNormalized) => void;
   onMoveFolder: (folder: FolderNormalized) => void;
+  onLinkToSkillMapping?: (material: MaterialNormalized) => void;
   showToast: (message: string) => void;
 }
 
@@ -42,11 +45,15 @@ export function useMaterialContextMenu({
     onDownloadMaterial,
     onRenameFolder,
     onMoveFolder,
+    onLinkToSkillMapping,
     showToast,
 }: UseMaterialContextMenuProps) {
+  const { user } = useAuth();
+  const hasTrainingPermission = checkPermission(user, 'training');
+
   const createMaterialMenuItems = useCallback(
     (material: MaterialNormalized): ContextMenuItem[] => {
-      return [
+      const items: ContextMenuItem[] = [
         {
           label: 'ダウンロード',
           icon: <Download className="w-4 h-4" />,
@@ -77,13 +84,25 @@ export function useMaterialContextMenu({
           icon: <Bell className="w-4 h-4" />,
           onClick: () => onSendNotification(material),
         },
-        {
-          label: 'ゴミ箱に移動',
-          icon: <Trash2 className="w-4 h-4" />,
-          onClick: () => moveMaterialToTrash(material),
-          danger: true,
-        },
       ];
+
+      // 教育訓練権限以上の場合のみ「スキルマップに関連付け」を追加
+      if (hasTrainingPermission && onLinkToSkillMapping) {
+        items.push({
+          label: 'スキルマップに関連付け',
+          icon: <Link className="w-4 h-4" />,
+          onClick: () => onLinkToSkillMapping(material),
+        });
+      }
+
+      items.push({
+        label: 'ゴミ箱に移動',
+        icon: <Trash2 className="w-4 h-4" />,
+        onClick: () => moveMaterialToTrash(material),
+        danger: true,
+      });
+
+      return items;
     },
     [
       copyPath,
@@ -93,6 +112,8 @@ export function useMaterialContextMenu({
       onShowMaterialInfo,
       onSendNotification,
       onDownloadMaterial,
+      hasTrainingPermission,
+      onLinkToSkillMapping,
     ]
   );
 

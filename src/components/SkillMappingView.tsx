@@ -2,16 +2,25 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { BookOpen } from 'lucide-react';
 import type { SkillPhaseItem, ProgressStatus } from '@/shared/lib/data-access/skill-mapping';
+import { useAuth } from '@/contexts/AuthContext';
+import { checkPermission } from '@/features/auth/utils';
+import SkillRelatedMaterialsModal from './SkillRelatedMaterialsModal';
+import type { MaterialNormalized } from '@/features/materials/types';
 
 interface SkillMappingViewProps {
   userId: string;
   readOnly?: boolean;
   onHasChangesChange?: (hasChanges: boolean) => void;
+  onMaterialClick?: (material: MaterialNormalized) => void;
+  allowUnlink?: boolean; // 関連付け解除を許可するか（プロフィールページではfalse、管理ページではtrue）
+  highlightedSkillIds?: Set<number>; // ハイライト対象のスキル項目ID
+  onHighlightSkills?: (materialTitle: string) => void; // 関連スキルにハイライトを付けるコールバック
 }
 
-export default function SkillMappingView({ userId, readOnly = false, onHasChangesChange }: SkillMappingViewProps) {
+export default function SkillMappingView({ userId, readOnly = false, onHasChangesChange, onMaterialClick, allowUnlink = true, highlightedSkillIds = new Set(), onHighlightSkills }: SkillMappingViewProps) {
   const [items, setItems] = useState<SkillPhaseItem[]>([]);
   const [progress, setProgress] = useState<Map<number, ProgressStatus>>(new Map());
   const [localProgress, setLocalProgress] = useState<Map<number, ProgressStatus>>(new Map()); // ローカルの変更を保持
@@ -19,6 +28,11 @@ export default function SkillMappingView({ userId, readOnly = false, onHasChange
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false); // 変更があるかどうか
+  const [isRelatedMaterialsModalOpen, setIsRelatedMaterialsModalOpen] = useState(false);
+  const [selectedSkillPhaseItem, setSelectedSkillPhaseItem] = useState<SkillPhaseItem | null>(null);
+  const [linkedItemIds, setLinkedItemIds] = useState<Set<number>>(new Set());
+  const { user } = useAuth();
+  const hasTrainingPermission = useMemo(() => checkPermission(user, 'training'), [user]);
 
   // スキルマスタと進捗データを取得
   useEffect(() => {
@@ -69,7 +83,48 @@ export default function SkillMappingView({ userId, readOnly = false, onHasChange
     if (userId) {
       fetchData();
     }
-  }, [userId]);
+  }, [userId, onHasChangesChange]);
+
+  // 教育訓練権限以上の場合、関連付け情報を取得（別のuseEffectで分離）
+  useEffect(() => {
+    if (!hasTrainingPermission || items.length === 0) {
+      setLinkedItemIds(new Set());
+      return;
+    }
+
+    const fetchLinkedItems = async () => {
+      try {
+        // バッチAPIで一度にすべての関連付け情報を取得
+        const skillPhaseItemIds = items.map((item) => item.id);
+        const response = await fetch('/api/skill-mapping/items/materials/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ skillPhaseItemIds }),
+        });
+
+        if (!response.ok) {
+          throw new Error('関連付け情報の取得に失敗しました');
+        }
+
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.error || '関連付け情報の取得に失敗しました');
+        }
+
+        // 関連付けがあるスキル項目IDをSetに変換
+        const linkedIds = new Set<number>((data.linkedItemIds || []).map((id: number) => id));
+
+        setLinkedItemIds(linkedIds);
+      } catch (err) {
+        console.error('関連付け情報取得エラー:', err);
+      }
+    };
+
+    fetchLinkedItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasTrainingPermission, items.length]); // items.lengthを使用して、itemsの内容が変わったときだけ再取得
 
   // 進捗状態を循環させる（ローカルのみ更新）
   const cycleProgress = (itemId: number) => {
@@ -340,20 +395,52 @@ export default function SkillMappingView({ userId, readOnly = false, onHasChange
                     >
                       {phaseItems.map((item) => {
                         const itemStatus = localProgress.get(item.id); // ローカル状態を使用
+                        const hasRelatedMaterials = hasTrainingPermission && linkedItemIds.has(item.id);
+                        const isHighlighted = highlightedSkillIds.has(item.id);
 
                         return (
                           <div
                             key={item.id}
-                            className={`mb-1 last:mb-0 p-2 rounded transition-colors ${
+                            className={`mb-1 last:mb-0 p-2 rounded transition-colors relative ${
                               getStatusStyle(itemStatus)
-                            } ${readOnly ? 'cursor-default' : saving ? 'opacity-50 cursor-wait' : 'cursor-pointer hover:opacity-80'}`}
-                            onClick={() => !readOnly && !saving && cycleProgress(item.id)}
-                            title={`${item.name} - ${getStatusLabel(itemStatus)}${readOnly ? '' : ' (クリックで変更)'}`}
+                            } ${isHighlighted ? 'ring-2 ring-yellow-400 dark:ring-yellow-500 bg-yellow-100 dark:bg-yellow-900/30' : ''} ${readOnly ? 'cursor-default' : saving ? 'opacity-50 cursor-wait' : 'cursor-pointer hover:opacity-80'}`}
+                            onClick={(e) => {
+                              // アイコンクリック時はモーダルを開く
+                              if (hasTrainingPermission && hasRelatedMaterials && (e.target as HTMLElement).closest('.skill-material-icon')) {
+                                e.stopPropagation();
+                                setSelectedSkillPhaseItem(item);
+                                setIsRelatedMaterialsModalOpen(true);
+                                return;
+                              }
+                              // それ以外は進捗を変更
+                              if (!readOnly && !saving) {
+                                cycleProgress(item.id);
+                              }
+                            }}
+                            title={`${item.name} - ${getStatusLabel(itemStatus)}${readOnly ? '' : ' (クリックで変更)'}${hasRelatedMaterials ? ' (関連資料あり)' : ''}`}
                           >
-                            <div className="text-xs font-medium">{item.name}</div>
-                            {item.description && (
-                              <div className="text-xs mt-1 opacity-75">{item.description}</div>
-                            )}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="text-xs font-medium">{item.name}</div>
+                                {item.description && (
+                                  <div className="text-xs mt-1 opacity-75">{item.description}</div>
+                                )}
+                              </div>
+                              {hasRelatedMaterials && (
+                                <button
+                                  className="skill-material-icon p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors flex-shrink-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedSkillPhaseItem(item);
+                                    setIsRelatedMaterialsModalOpen(true);
+                                  }}
+                                  title="関連資料を表示"
+                                  aria-label="関連資料を表示"
+                                >
+                                  <BookOpen className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -366,6 +453,23 @@ export default function SkillMappingView({ userId, readOnly = false, onHasChange
         </table>
         </div>
       </div>
+
+      {/* 関連資料表示モーダル */}
+      {selectedSkillPhaseItem && (
+        <SkillRelatedMaterialsModal
+          isOpen={isRelatedMaterialsModalOpen}
+          onClose={() => {
+            setIsRelatedMaterialsModalOpen(false);
+            setSelectedSkillPhaseItem(null);
+          }}
+          skillPhaseItemId={selectedSkillPhaseItem.id}
+          skillPhaseItemName={`${selectedSkillPhaseItem.category} > ${selectedSkillPhaseItem.item} > フェーズ${selectedSkillPhaseItem.phase}`}
+          onMaterialClick={onMaterialClick || (() => {})}
+          readOnly={readOnly}
+          allowUnlink={allowUnlink}
+          onHighlightSkills={onHighlightSkills}
+        />
+      )}
     </div>
   );
 }

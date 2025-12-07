@@ -3,9 +3,11 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Download, FileEdit, Copy, Move, Info, Trash2, RefreshCw, Bell } from 'lucide-react';
+import { Download, FileEdit, Copy, Move, Info, Trash2, RefreshCw, Bell, Link } from 'lucide-react';
 import type { MaterialNormalized } from '@/features/materials/types';
 import type { ContextMenuItem } from '@/components/ContextMenu';
+import { useAuth } from '@/contexts/AuthContext';
+import { checkPermission } from '@/features/auth/utils';
 
 interface UseMaterialsSearchContextMenuProps {
   onRefresh?: () => Promise<void>;
@@ -15,6 +17,7 @@ interface UseMaterialsSearchContextMenuProps {
   onDownloadMaterial?: (material: MaterialNormalized) => Promise<void>;
   onEditMaterial?: (material: MaterialNormalized) => void;
   onMoveToTrash?: (material: MaterialNormalized) => Promise<void>;
+  onLinkToSkillMapping?: (material: MaterialNormalized) => void;
   showToast: (message: string) => void;
 }
 
@@ -26,8 +29,11 @@ export function useMaterialsSearchContextMenu({
   onDownloadMaterial,
   onEditMaterial,
   onMoveToTrash,
+  onLinkToSkillMapping,
   showToast,
 }: UseMaterialsSearchContextMenuProps) {
+  const { user } = useAuth();
+  const hasTrainingPermission = checkPermission(user, 'training');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
 
   // 背景エリアの右クリック処理
@@ -129,17 +135,27 @@ export function useMaterialsSearchContextMenu({
             }
           },
         },
-        {
-          label: 'ゴミ箱に移動',
-          icon: <Trash2 className="w-4 h-4" />,
-          onClick: async () => {
-            if (onMoveToTrash) {
-              await onMoveToTrash(material);
-            }
-          },
-          danger: true,
-        },
       ];
+
+      // 教育訓練権限以上の場合のみ「スキルマップに関連付け」を追加
+      if (hasTrainingPermission && onLinkToSkillMapping) {
+        items.push({
+          label: 'スキルマップに関連付け',
+          icon: <Link className="w-4 h-4" />,
+          onClick: () => onLinkToSkillMapping(material),
+        });
+      }
+
+      items.push({
+        label: 'ゴミ箱に移動',
+        icon: <Trash2 className="w-4 h-4" />,
+        onClick: async () => {
+          if (onMoveToTrash) {
+            await onMoveToTrash(material);
+          }
+        },
+        danger: true,
+      });
 
       setContextMenu({
         x: e.clientX,
@@ -147,7 +163,7 @@ export function useMaterialsSearchContextMenu({
         items,
       });
     },
-    [onDownloadMaterial, onMoveMaterial, onShowMaterialInfo, onSendNotification, onEditMaterial, onMoveToTrash]
+    [onDownloadMaterial, onMoveMaterial, onShowMaterialInfo, onSendNotification, onEditMaterial, onMoveToTrash, hasTrainingPermission, onLinkToSkillMapping]
   );
 
   return {

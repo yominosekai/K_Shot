@@ -21,6 +21,7 @@ import { useMaterialPathManager } from './MaterialLibraryBrowser/hooks/useMateri
 import { useAuth } from '@/contexts/AuthContext';
 import type { MaterialNormalized, CategoryNormalized } from '@/features/materials/types';
 import type { User } from '@/features/auth/types';
+import SkillMappingSelectionModal from './SkillMappingSelectionModal';
 
 interface MaterialsSearchTabProps {
   viewMode: 'grid' | 'list';
@@ -77,6 +78,8 @@ export default function MaterialsSearchTab({
 }: MaterialsSearchTabProps) {
   const [toastMessage, setToastMessage] = useState<string>('');
   const [isToastVisible, setIsToastVisible] = useState(false);
+  const [isSkillMappingModalOpen, setIsSkillMappingModalOpen] = useState(false);
+  const [selectedMaterialForSkillMapping, setSelectedMaterialForSkillMapping] = useState<MaterialNormalized | null>(null);
   const { user } = useAuth();
 
   const showToast = (message: string) => {
@@ -113,6 +116,21 @@ export default function MaterialsSearchTab({
   // ダウンロード処理
   const { downloadMaterial } = useMaterialDownload(showToast);
 
+  // スキルマップ関連付けの処理
+  const handleLinkToSkillMapping = (material: MaterialNormalized) => {
+    setSelectedMaterialForSkillMapping(material);
+    setIsSkillMappingModalOpen(true);
+  };
+
+  const handleSkillMappingLinkToggle = (skillPhaseItemId: number, linked: boolean) => {
+    // 関連付けのトグルが完了したことを通知
+    if (linked) {
+      showToast('スキルマップに関連付けました');
+    } else {
+      showToast('スキルマップとの関連付けを解除しました');
+    }
+  };
+
   // コンテキストメニュー
   const {
     contextMenu,
@@ -127,6 +145,7 @@ export default function MaterialsSearchTab({
     onDownloadMaterial: downloadMaterial,
     onEditMaterial: modals.openEditModal,
     onMoveToTrash: moveMaterialToTrash,
+    onLinkToSkillMapping: handleLinkToSkillMapping,
     showToast,
   });
 
@@ -248,6 +267,20 @@ export default function MaterialsSearchTab({
           showToast('通知を送信しました');
         }}
       />
+
+      {/* スキルマップ選択モーダル */}
+      {selectedMaterialForSkillMapping && (
+        <SkillMappingSelectionModal
+          isOpen={isSkillMappingModalOpen}
+          onClose={() => {
+            setIsSkillMappingModalOpen(false);
+            setSelectedMaterialForSkillMapping(null);
+          }}
+          materialId={selectedMaterialForSkillMapping.id}
+          materialTitle={selectedMaterialForSkillMapping.title}
+          onLinkToggle={handleSkillMappingLinkToggle}
+        />
+      )}
 
       {/* 資料編集モーダル */}
       <MaterialCreationModal

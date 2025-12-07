@@ -359,3 +359,227 @@ export async function removeProgress(userId: string, skillPhaseItemId: number): 
   }
 }
 
+// スキル-資料関連付けの型定義
+export interface SkillMaterialRelation {
+  skillPhaseItemId: number;
+  materialId: string;
+  displayOrder: number | null;
+  createdDate: string;
+}
+
+/**
+ * スキル項目に関連付けられた資料を取得
+ */
+export function getSkillPhaseItemMaterials(skillPhaseItemId: number): SkillMaterialRelation[] {
+  try {
+    const db = getDatabase();
+    const relations = db
+      .prepare(
+        `
+      SELECT 
+        skill_phase_item_id as skillPhaseItemId,
+        material_id as materialId,
+        display_order as displayOrder,
+        created_date as createdDate
+      FROM skill_phase_item_materials
+      WHERE skill_phase_item_id = ?
+      ORDER BY COALESCE(display_order, 999999), created_date
+    `
+      )
+      .all(skillPhaseItemId) as SkillMaterialRelation[];
+
+    debug(MODULE_NAME, `スキル項目の関連資料取得: itemId=${skillPhaseItemId}, ${relations.length}件`);
+    return relations;
+  } catch (err) {
+    error(MODULE_NAME, `スキル項目の関連資料取得エラー: itemId=${skillPhaseItemId}`, err);
+    return [];
+  }
+}
+
+/**
+ * 複数のスキル項目に関連付けがあるかどうかを一括取得（最適化版）
+ * @param skillPhaseItemIds スキル項目IDの配列
+ * @returns 関連付けがあるスキル項目IDのSet
+ */
+export function getSkillPhaseItemsWithMaterials(skillPhaseItemIds: number[]): Set<number> {
+  try {
+    if (skillPhaseItemIds.length === 0) {
+      return new Set();
+    }
+
+    const db = getDatabase();
+    // IN句で一度に取得
+    const placeholders = skillPhaseItemIds.map(() => '?').join(',');
+    const relations = db
+      .prepare(
+        `
+      SELECT DISTINCT skill_phase_item_id as skillPhaseItemId
+      FROM skill_phase_item_materials
+      WHERE skill_phase_item_id IN (${placeholders})
+    `
+      )
+      .all(...skillPhaseItemIds) as Array<{ skillPhaseItemId: number }>;
+
+    const linkedIds = new Set(relations.map((r) => r.skillPhaseItemId));
+    debug(MODULE_NAME, `一括関連付けチェック: ${skillPhaseItemIds.length}件中${linkedIds.size}件に関連付けあり`);
+    return linkedIds;
+  } catch (err) {
+    error(MODULE_NAME, '一括関連付けチェックエラー:', err);
+    return new Set();
+  }
+}
+
+/**
+ * 資料に関連付けられたスキル項目を取得
+ */
+export function getMaterialSkillPhaseItems(materialId: string): number[] {
+  try {
+    const db = getDatabase();
+    const relations = db
+      .prepare(
+        `
+      SELECT skill_phase_item_id
+      FROM skill_phase_item_materials
+      WHERE material_id = ?
+    `
+      )
+      .all(materialId) as Array<{ skill_phase_item_id: number }>;
+
+    const skillPhaseItemIds = relations.map((r) => r.skill_phase_item_id);
+    debug(MODULE_NAME, `資料の関連スキル項目取得: materialId=${materialId}, ${skillPhaseItemIds.length}件`);
+    return skillPhaseItemIds;
+  } catch (err) {
+    error(MODULE_NAME, `資料の関連スキル項目取得エラー: materialId=${materialId}`, err);
+    return [];
+  }
+}
+
+/**
+ * 複数の資料に関連付けられたスキル項目を一括取得（最適化版）
+ * @param materialIds 資料IDの配列
+ * @returns 関連付けがあるスキル項目IDのSet
+ */
+export function getMaterialsSkillPhaseItems(materialIds: string[]): Set<number> {
+  try {
+    if (materialIds.length === 0) {
+      return new Set();
+    }
+
+    const db = getDatabase();
+    // IN句で一度に取得
+    const placeholders = materialIds.map(() => '?').join(',');
+    const relations = db
+      .prepare(
+        `
+      SELECT DISTINCT skill_phase_item_id as skillPhaseItemId
+      FROM skill_phase_item_materials
+      WHERE material_id IN (${placeholders})
+    `
+      )
+      .all(...materialIds) as Array<{ skillPhaseItemId: number }>;
+
+    const skillPhaseItemIds = new Set(relations.map((r) => r.skillPhaseItemId));
+    debug(MODULE_NAME, `一括関連スキル項目取得: materialIds=${materialIds.length}件, ${skillPhaseItemIds.size}件のスキル項目に関連付けあり`);
+    return skillPhaseItemIds;
+  } catch (err) {
+    error(MODULE_NAME, '一括関連スキル項目取得エラー:', err);
+    return new Set();
+  }
+}
+
+/**
+ * スキル項目と資料を関連付け
+ */
+export function linkSkillPhaseItemToMaterial(
+  skillPhaseItemId: number,
+  materialId: string,
+  displayOrder?: number | null
+): boolean {
+  try {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+    db.prepare(
+      `
+      INSERT OR REPLACE INTO skill_phase_item_materials (
+        skill_phase_item_id,
+        material_id,
+        display_order,
+        created_date
+      ) VALUES (?, ?, ?, ?)
+    `
+    ).run(skillPhaseItemId, materialId, displayOrder || null, now);
+
+    info(MODULE_NAME, `スキル項目と資料を関連付け: itemId=${skillPhaseItemId}, materialId=${materialId}`);
+    return true;
+  } catch (err) {
+    error(
+      MODULE_NAME,
+      `スキル項目と資料の関連付けエラー: itemId=${skillPhaseItemId}, materialId=${materialId}`,
+      err
+    );
+    return false;
+  }
+}
+
+/**
+ * スキル項目と資料の関連付けを解除
+ */
+export function unlinkSkillPhaseItemFromMaterial(skillPhaseItemId: number, materialId: string): boolean {
+  try {
+    const db = getDatabase();
+    db.prepare(
+      `
+      DELETE FROM skill_phase_item_materials
+      WHERE skill_phase_item_id = ? AND material_id = ?
+    `
+    ).run(skillPhaseItemId, materialId);
+
+    info(MODULE_NAME, `スキル項目と資料の関連付け解除: itemId=${skillPhaseItemId}, materialId=${materialId}`);
+    return true;
+  } catch (err) {
+    error(
+      MODULE_NAME,
+      `スキル項目と資料の関連付け解除エラー: itemId=${skillPhaseItemId}, materialId=${materialId}`,
+      err
+    );
+    return false;
+  }
+}
+
+/**
+ * スキル項目と資料の関連付けをトグル（既存なら解除、なければ追加）
+ */
+export function toggleSkillPhaseItemMaterialLink(
+  skillPhaseItemId: number,
+  materialId: string
+): { linked: boolean; success: boolean } {
+  try {
+    const db = getDatabase();
+    const existing = db
+      .prepare(
+        `
+      SELECT 1 FROM skill_phase_item_materials
+      WHERE skill_phase_item_id = ? AND material_id = ?
+    `
+      )
+      .get(skillPhaseItemId, materialId);
+
+    if (existing) {
+      // 既存の関連付けを解除
+      const success = unlinkSkillPhaseItemFromMaterial(skillPhaseItemId, materialId);
+      return { linked: false, success };
+    } else {
+      // 新規に関連付け
+      const success = linkSkillPhaseItemToMaterial(skillPhaseItemId, materialId);
+      return { linked: true, success };
+    }
+  } catch (err) {
+    error(
+      MODULE_NAME,
+      `スキル項目と資料の関連付けトグルエラー: itemId=${skillPhaseItemId}, materialId=${materialId}`,
+      err
+    );
+    return { linked: false, success: false };
+  }
+}
+

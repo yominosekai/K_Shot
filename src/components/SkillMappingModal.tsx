@@ -6,20 +6,28 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, Maximize2, Minimize2 } from 'lucide-react';
 import { useConfirmDialog } from '@/contexts/ConfirmDialogContext';
 import SkillMappingView from './SkillMappingView';
+import MaterialModal from './MaterialModal';
+import type { MaterialNormalized } from '@/features/materials/types';
 
 interface SkillMappingModalProps {
   isOpen: boolean;
   onClose: () => void;
   userId: string;
+  readOnly?: boolean; // 読み取り専用モード（進捗編集の制御）
+  allowUnlink?: boolean; // 関連付け解除を許可するか（プロフィールページではfalse、管理ページではtrue）
 }
 
 export default function SkillMappingModal({
   isOpen,
   onClose,
   userId,
+  readOnly = false,
+  allowUnlink = true,
 }: SkillMappingModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState<MaterialNormalized | null>(null);
+  const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
   const confirmDialog = useConfirmDialog();
 
   // 閉じる処理（変更がある場合は確認）
@@ -112,9 +120,30 @@ export default function SkillMappingModal({
 
         {/* コンテンツ */}
         <div className="flex-1 overflow-auto">
-          <SkillMappingView userId={userId} onHasChangesChange={setHasChanges} />
+          <SkillMappingView
+            userId={userId}
+            readOnly={readOnly}
+            onHasChangesChange={setHasChanges}
+            onMaterialClick={(material) => {
+              setSelectedMaterial(material);
+              setIsMaterialModalOpen(true);
+            }}
+            allowUnlink={allowUnlink}
+          />
         </div>
       </div>
+
+      {/* 資料詳細モーダル */}
+      {selectedMaterial && (
+        <MaterialModal
+          material={selectedMaterial}
+          isOpen={isMaterialModalOpen}
+          onClose={() => {
+            setIsMaterialModalOpen(false);
+            setSelectedMaterial(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -3,10 +3,12 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { Download, Info, Bell, FileEdit, Copy, RefreshCw, Trash2 } from 'lucide-react';
+import { Download, Info, Bell, FileEdit, Copy, RefreshCw, Trash2, Link } from 'lucide-react';
 import type { ContextMenuItem } from '@/components/ContextMenu';
 import type { MaterialNormalized } from '@/features/materials/types';
 import { downloadMaterialAsZip } from '@/shared/lib/utils/material-download';
+import { useAuth } from '@/contexts/AuthContext';
+import { checkPermission } from '@/features/auth/utils';
 
 interface UseFavoritesContextMenuProps {
   showToast: (message: string) => void;
@@ -15,6 +17,7 @@ interface UseFavoritesContextMenuProps {
   onSendNotification: (material: MaterialNormalized) => void;
   onRefresh: () => void;
   onCleanup: () => void;
+  onLinkToSkillMapping?: (material: MaterialNormalized) => void;
 }
 
 export function useFavoritesContextMenu({
@@ -24,7 +27,10 @@ export function useFavoritesContextMenu({
   onSendNotification,
   onRefresh,
   onCleanup,
+  onLinkToSkillMapping,
 }: UseFavoritesContextMenuProps) {
+  const { user } = useAuth();
+  const hasTrainingPermission = checkPermission(user, 'training');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
 
   // 資料のパスをコピーする処理
@@ -181,13 +187,22 @@ export function useFavoritesContextMenu({
         },
       ];
 
+      // 教育訓練権限以上の場合のみ「スキルマップに関連付け」を追加
+      if (hasTrainingPermission && onLinkToSkillMapping) {
+        items.push({
+          label: 'スキルマップに関連付け',
+          icon: <Link className="w-4 h-4" />,
+          onClick: () => onLinkToSkillMapping(material),
+        });
+      }
+
       setContextMenu({
         x: e.clientX,
         y: e.clientY,
         items,
       });
     },
-    [showToast, onEditMaterial, onShowInfo, onSendNotification, copyMaterialPath]
+    [showToast, onEditMaterial, onShowInfo, onSendNotification, copyMaterialPath, hasTrainingPermission, onLinkToSkillMapping]
   );
 
   // 背景の右クリックメニューの処理

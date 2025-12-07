@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { X } from 'lucide-react';
 import FullscreenToggleButton from '@/components/FullscreenToggleButton';
 import { useConfirmDialog } from '@/contexts/ConfirmDialogContext';
 import type { SkillPhaseItem as BaseSkillPhaseItem } from '@/shared/lib/data-access/skill-mapping';
@@ -16,10 +17,15 @@ import { validateData } from './validation';
 import { compareData, type ComparisonResult } from './utils/compareData';
 import type { User } from '@/features/auth/types';
 import SkillMappingView from '@/components/SkillMappingView';
+import SkillHeatMap from './SkillHeatMap';
+import DepartmentFilter from './DepartmentFilter';
+import StatsCards from './StatsCards';
+import MaterialModal from '@/components/MaterialModal';
+import type { MaterialNormalized } from '@/features/materials/types';
 
 interface SkillMappingManagementViewProps {}
 
-type TabType = 'view' | 'edit';
+type TabType = 'view' | 'edit' | 'heatmap';
 
 export default function SkillMappingManagementView({}: SkillMappingManagementViewProps) {
   const confirmDialog = useConfirmDialog();
@@ -53,6 +59,20 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [usersLoading, setUsersLoading] = useState(false);
+  
+  // ヒートマップ用のstate
+  const [heatMapData, setHeatMapData] = useState<{
+    data: Array<{ userId: string; category: string; maxPhase: number; phaseBreakdown: Record<number, number> }>;
+    users: Array<{ id: string; display_name: string; department?: string }>;
+    categories: string[];
+  } | null>(null);
+  const [heatMapLoading, setHeatMapLoading] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  const [selectedMaterial, setSelectedMaterial] = useState<MaterialNormalized | null>(null);
+  const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [highlightedSkillIds, setHighlightedSkillIds] = useState<Set<number>>(new Set());
+  const [isSearching, setIsSearching] = useState(false);
 
   // スキルマスタデータを取得
   useEffect(() => {
@@ -89,6 +109,99 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
       fetchUsers();
     }
   }, [activeTab, fetchUsers]);
+
+  // ヒートマップデータを取得
+  const fetchHeatMapData = useCallback(async () => {
+    try {
+      setHeatMapLoading(true);
+      const response = await fetch('/api/skill-mapping/heatmap');
+      if (!response.ok) {
+        throw new Error('ヒートマップデータの取得に失敗しました');
+      }
+      const data = await response.json();
+      if (data.success) {
+        setHeatMapData(data);
+      } else {
+        throw new Error(data.error || 'ヒートマップデータの取得に失敗しました');
+      }
+    } catch (err) {
+      console.error('ヒートマップデータ取得エラー:', err);
+    } finally {
+      setHeatMapLoading(false);
+    }
+  }, []);
+
+  // ヒートマップタブがアクティブになったときにヒートマップデータを取得
+  useEffect(() => {
+    if (activeTab === 'heatmap') {
+      fetchHeatMapData();
+    }
+  }, [activeTab, fetchHeatMapData]);
+
+  // 検索機能：ナレッジ名で検索して関連スキルをハイライト
+  const handleSearch = useCallback(async (searchValue: string) => {
+    if (!searchValue.trim()) {
+      setHighlightedSkillIds(new Set());
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      // 資料を検索
+      const materialsResponse = await fetch(`/api/materials?search=${encodeURIComponent(searchValue)}`);
+      if (!materialsResponse.ok) {
+        throw new Error('資料の検索に失敗しました');
+      }
+      const materialsData = await materialsResponse.json();
+      if (!materialsData.success) {
+        throw new Error(materialsData.error || '資料の検索に失敗しました');
+      }
+
+      const materials = materialsData.materials || [];
+      if (materials.length === 0) {
+        setHighlightedSkillIds(new Set());
+        setIsSearching(false);
+        return;
+      }
+
+      // バッチAPIで一括取得
+      const materialIds = materials.map((material: MaterialNormalized) => material.id);
+      const batchResponse = await fetch('/api/materials/skills/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ materialIds }),
+      });
+
+      if (!batchResponse.ok) {
+        throw new Error('関連スキル項目の一括取得に失敗しました');
+      }
+
+      const batchData = await batchResponse.json();
+      if (!batchData.success) {
+        throw new Error(batchData.error || '関連スキル項目の一括取得に失敗しました');
+      }
+
+      const skillIds = new Set<number>(batchData.skillPhaseItemIds || []);
+      console.log('ハイライト対象スキル項目ID:', Array.from(skillIds));
+      setHighlightedSkillIds(skillIds);
+    } catch (err) {
+      console.error('検索エラー:', err);
+      setHighlightedSkillIds(new Set());
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  // 検索語が変更されたときに検索を実行
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      handleSearch(searchTerm);
+    }, 300); // デバウンス: 300ms待機
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, handleSearch]);
 
   const fetchItems = async () => {
     try {
@@ -628,6 +741,16 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
               >
                 利用者スキルマップ確認
               </button>
+              <button
+                onClick={() => setActiveTab('heatmap')}
+                className={`px-4 py-2 font-semibold transition-colors ${
+                  activeTab === 'heatmap'
+                    ? 'text-green-600 dark:text-green-400 border-b-2 border-green-500 dark:border-green-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                ヒートマップ
+              </button>
             </div>
           </div>
 
@@ -663,7 +786,19 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
               {/* スキルマップ表示 */}
               {selectedUserId && (
                 <div>
-                  <SkillMappingView userId={selectedUserId} readOnly={true} />
+                  <SkillMappingView
+                    userId={selectedUserId}
+                    readOnly={true}
+                    allowUnlink={true}
+                    highlightedSkillIds={highlightedSkillIds}
+                    onHighlightSkills={(materialTitle) => {
+                      setSearchTerm(materialTitle);
+                    }}
+                    onMaterialClick={(material) => {
+                      setSelectedMaterial(material);
+                      setIsMaterialModalOpen(true);
+                    }}
+                  />
                 </div>
               )}
 
@@ -677,10 +812,151 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
             </div>
           )}
 
+          {activeTab === 'heatmap' && (
+            <div className="space-y-6">
+              {/* 部署フィルタ */}
+              {heatMapData && heatMapData.users.length > 0 && (() => {
+                const departments = Array.from(new Set(heatMapData.users.map(u => u.department).filter(Boolean))) as string[];
+                if (departments.length > 0) {
+                  return (
+                    <DepartmentFilter
+                      departments={departments}
+                      selectedDepartment={selectedDepartment}
+                      onDepartmentChange={setSelectedDepartment}
+                    />
+                  );
+                }
+                return null;
+              })()}
+
+              {/* 統計カード */}
+              {heatMapData && (() => {
+                const filteredUsers = selectedDepartment === 'all'
+                  ? heatMapData.users
+                  : heatMapData.users.filter(u => u.department === selectedDepartment);
+                const filteredUserIds = new Set(filteredUsers.map(u => u.id));
+                const filteredData = heatMapData.data.filter(d => filteredUserIds.has(d.userId));
+
+                // 統計データを計算
+                const userMaxPhases = new Map<string, number[]>();
+                for (const item of filteredData) {
+                  if (!userMaxPhases.has(item.userId)) {
+                    userMaxPhases.set(item.userId, []);
+                  }
+                  userMaxPhases.get(item.userId)!.push(item.maxPhase);
+                }
+
+                const userAveragePhases: number[] = [];
+                for (const phases of userMaxPhases.values()) {
+                  const avg = phases.reduce((sum, p) => sum + p, 0) / phases.length;
+                  userAveragePhases.push(avg);
+                }
+
+                const totalAvg = userAveragePhases.length > 0
+                  ? userAveragePhases.reduce((sum, p) => sum + p, 0) / userAveragePhases.length
+                  : 0;
+
+                const phaseDistribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                for (const item of filteredData) {
+                  for (const [phase, count] of Object.entries(item.phaseBreakdown)) {
+                    const phaseNum = parseInt(phase);
+                    if (phaseNum >= 1 && phaseNum <= 5) {
+                      phaseDistribution[phaseNum] += count;
+                    }
+                  }
+                }
+
+                const phase4Plus = userAveragePhases.filter(p => p >= 4).length;
+
+                const stats = {
+                  totalUsers: filteredUsers.length,
+                  averagePhase: totalAvg,
+                  phase4Plus,
+                  department: selectedDepartment,
+                  phaseDistribution,
+                };
+
+                return <StatsCards stats={stats} />;
+              })()}
+
+              {/* ヒートマップ */}
+              {heatMapData && (() => {
+                const filteredUsers = selectedDepartment === 'all'
+                  ? heatMapData.users
+                  : heatMapData.users.filter(u => u.department === selectedDepartment);
+                const filteredUserIds = new Set(filteredUsers.map(u => u.id));
+                const filteredData = heatMapData.data.filter(d => filteredUserIds.has(d.userId));
+
+                return (
+                  <SkillHeatMap
+                    users={filteredUsers}
+                    categories={heatMapData.categories}
+                    data={filteredData}
+                    loading={heatMapLoading}
+                    onRefresh={fetchHeatMapData}
+                  />
+                );
+              })()}
+
+              {!heatMapData && !heatMapLoading && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 dark:text-gray-400">データがありません</p>
+                </div>
+              )}
+
+              {heatMapLoading && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === 'edit' && (
             <div className="space-y-6">
-              {/* ボタン */}
-              <div className="flex justify-end gap-2">
+              {/* 検索欄とボタン */}
+              <div className="flex items-start justify-between gap-4">
+                {/* 検索欄（左側） */}
+                <div className="flex-1 max-w-md relative">
+                  <label htmlFor="skill-search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    ナレッジ検索（関連スキルをハイライト）
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="skill-search"
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="ナレッジ名で検索..."
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400"
+                    />
+                    {isSearching && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-500"></div>
+                      </div>
+                    )}
+                    {searchTerm && !isSearching && (
+                      <button
+                        onClick={() => {
+                          setSearchTerm('');
+                          setHighlightedSkillIds(new Set());
+                        }}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        aria-label="検索をクリア"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  {/* メッセージ（絶対配置でレイアウトシフトを防ぐ） */}
+                  {highlightedSkillIds.size > 0 && (
+                    <p className="absolute top-full left-0 mt-1 text-xs text-green-600 dark:text-green-400">
+                      {highlightedSkillIds.size}件のスキル項目がハイライトされています
+                    </p>
+                  )}
+                </div>
+                {/* ボタン（右側） */}
+                <div className="flex gap-2 pt-7">
                 {!isEditMode ? (
                   <>
                     <button
@@ -734,12 +1010,24 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
                     </button>
                   </>
                 )}
+                </div>
               </div>
 
               {/* エクセル形式表示テーブル */}
               <div className="overflow-x-auto mb-5">
                 {!isEditMode ? (
-                  <ExcelViewModeTable data={items} />
+                  <ExcelViewModeTable
+                    data={items}
+                    allowUnlink={true}
+                    highlightedSkillIds={highlightedSkillIds}
+                    onHighlightSkills={(materialTitle) => {
+                      setSearchTerm(materialTitle);
+                    }}
+                    onMaterialClick={(material) => {
+                      setSelectedMaterial(material);
+                      setIsMaterialModalOpen(true);
+                    }}
+                  />
                 ) : (
                   <EditModeTable
                     data={editItems}
@@ -807,6 +1095,18 @@ export default function SkillMappingManagementView({}: SkillMappingManagementVie
         comparisonResult={comparisonResult}
         isSaving={isSaving}
       />
+
+      {/* 資料詳細モーダル */}
+      {selectedMaterial && (
+        <MaterialModal
+          material={selectedMaterial}
+          isOpen={isMaterialModalOpen}
+          onClose={() => {
+            setIsMaterialModalOpen(false);
+            setSelectedMaterial(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -2,13 +2,66 @@
 
 'use client';
 
+import { useState, useEffect, useMemo } from 'react';
+import { BookOpen } from 'lucide-react';
 import type { SkillPhaseItem } from '@/shared/lib/data-access/skill-mapping';
+import { useAuth } from '@/contexts/AuthContext';
+import { checkPermission } from '@/features/auth/utils';
+import SkillRelatedMaterialsModal from '@/components/SkillRelatedMaterialsModal';
+import type { MaterialNormalized } from '@/features/materials/types';
 
 interface ExcelViewModeTableProps {
   data: SkillPhaseItem[];
+  onMaterialClick?: (material: MaterialNormalized) => void;
+  allowUnlink?: boolean;
+  highlightedSkillIds?: Set<number>;
+  onHighlightSkills?: (materialTitle: string) => void;
 }
 
-export default function ExcelViewModeTable({ data }: ExcelViewModeTableProps) {
+export default function ExcelViewModeTable({ data, onMaterialClick, allowUnlink = true, highlightedSkillIds = new Set(), onHighlightSkills }: ExcelViewModeTableProps) {
+  const [linkedItemIds, setLinkedItemIds] = useState<Set<number>>(new Set());
+  const [isRelatedMaterialsModalOpen, setIsRelatedMaterialsModalOpen] = useState(false);
+  const [selectedSkillPhaseItem, setSelectedSkillPhaseItem] = useState<SkillPhaseItem | null>(null);
+  const { user } = useAuth();
+  const hasTrainingPermission = useMemo(() => checkPermission(user, 'training'), [user]);
+
+  // 関連付け情報を取得
+  useEffect(() => {
+    if (!hasTrainingPermission || data.length === 0) {
+      setLinkedItemIds(new Set());
+      return;
+    }
+
+    const fetchLinkedItems = async () => {
+      try {
+        const skillPhaseItemIds = data.map((item) => item.id);
+        const response = await fetch('/api/skill-mapping/items/materials/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ skillPhaseItemIds }),
+        });
+
+        if (!response.ok) {
+          throw new Error('関連付け情報の取得に失敗しました');
+        }
+
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(result.error || '関連付け情報の取得に失敗しました');
+        }
+
+        const linkedIds = new Set<number>((result.linkedItemIds || []).map((id: number) => id));
+        setLinkedItemIds(linkedIds);
+      } catch (err) {
+        console.error('関連付け情報取得エラー:', err);
+      }
+    };
+
+    fetchLinkedItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasTrainingPermission, data.length]);
   // データを階層ごとにグループ化
   const grouped: Record<string, SkillPhaseItem[]> = {};
   data.forEach((row) => {
@@ -35,11 +88,11 @@ export default function ExcelViewModeTable({ data }: ExcelViewModeTableProps) {
     item: string | null;
     itemRowspan: number;
     subCategory: string;
-    phase1: string;
-    phase2: string;
-    phase3: string;
-    phase4: string;
-    phase5: string;
+    phase1: SkillPhaseItem[];
+    phase2: SkillPhaseItem[];
+    phase3: SkillPhaseItem[];
+    phase4: SkillPhaseItem[];
+    phase5: SkillPhaseItem[];
   }> = [];
 
   // displayOrderを取得するヘルパー関数
@@ -119,30 +172,13 @@ export default function ExcelViewModeTable({ data }: ExcelViewModeTableProps) {
           phaseGroups[row.phase].push(row);
         });
 
-        // フェーズ1～5のデータを準備
-        const phaseData: Record<number, string> = {};
+        // フェーズ1～5のデータを準備（個々のスキル項目を保持）
+        const phaseData: Record<number, SkillPhaseItem[]> = {};
         for (let phase = 1; phase <= 5; phase++) {
           if (phaseGroups[phase]) {
-            // 小分類ごとにグループ化
-            const smallCategoryGroups: Record<string, SkillPhaseItem[]> = {};
-            phaseGroups[phase].forEach((row) => {
-              if (!smallCategoryGroups[row.smallCategory]) {
-                smallCategoryGroups[row.smallCategory] = [];
-              }
-              smallCategoryGroups[row.smallCategory].push(row);
-            });
-
-            // 小分類ごとにテキストを生成（各取り組み名を別行に）
-            const texts: string[] = [];
-            Object.keys(smallCategoryGroups).forEach((smallCategory) => {
-              const items = smallCategoryGroups[smallCategory];
-              items.forEach((item) => {
-                texts.push(`${smallCategory}: ${item.name}`);
-              });
-            });
-            phaseData[phase] = texts.join('\n');
+            phaseData[phase] = phaseGroups[phase];
           } else {
-            phaseData[phase] = '';
+            phaseData[phase] = [];
           }
         }
 
@@ -248,57 +284,79 @@ export default function ExcelViewModeTable({ data }: ExcelViewModeTableProps) {
                   <td className={`border border-gray-400 dark:border-gray-600 px-4 py-3 text-sm text-gray-900 dark:text-white text-left align-middle bg-gray-50 dark:bg-gray-700 ${isLastRowFirstCellIfNoCategoryAndItem ? 'rounded-bl-lg' : ''}`}>
                     {row.subCategory}
                   </td>
-                  <td className="border border-gray-400 dark:border-gray-600 px-4 py-3 text-xs text-gray-900 dark:text-white align-top whitespace-pre-line">
-                    {row.phase1 && (
-                      <div className="space-y-1">
-                        {row.phase1.split('\n').map((text, i) => (
-                          <div key={i}>{text}</div>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                  <td className="border border-gray-400 dark:border-gray-600 px-4 py-3 text-xs text-gray-900 dark:text-white align-top whitespace-pre-line">
-                    {row.phase2 && (
-                      <div className="space-y-1">
-                        {row.phase2.split('\n').map((text, i) => (
-                          <div key={i}>{text}</div>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                  <td className="border border-gray-400 dark:border-gray-600 px-4 py-3 text-xs text-gray-900 dark:text-white align-top whitespace-pre-line">
-                    {row.phase3 && (
-                      <div className="space-y-1">
-                        {row.phase3.split('\n').map((text, i) => (
-                          <div key={i}>{text}</div>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                  <td className="border border-gray-400 dark:border-gray-600 px-4 py-3 text-xs text-gray-900 dark:text-white align-top whitespace-pre-line">
-                    {row.phase4 && (
-                      <div className="space-y-1">
-                        {row.phase4.split('\n').map((text, i) => (
-                          <div key={i}>{text}</div>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                  <td className={`border border-gray-400 dark:border-gray-600 px-4 py-3 text-xs text-gray-900 dark:text-white align-top whitespace-pre-line ${isLastRow ? 'rounded-br-lg' : ''}`}>
-                    {row.phase5 && (
-                      <div className="space-y-1">
-                        {row.phase5.split('\n').map((text, i) => (
-                          <div key={i}>{text}</div>
-                        ))}
-                      </div>
-                    )}
-                  </td>
+                  {[1, 2, 3, 4, 5].map((phase) => {
+                    const phaseItems = row[`phase${phase}` as keyof typeof row] as SkillPhaseItem[];
+                    const isLastPhase = phase === 5;
+                    return (
+                      <td
+                        key={phase}
+                        className={`border border-gray-400 dark:border-gray-600 px-4 py-3 text-xs text-gray-900 dark:text-white align-top ${isLastRow && isLastPhase ? 'rounded-br-lg' : ''}`}
+                      >
+                        {phaseItems && phaseItems.length > 0 && (
+                          <div className="space-y-1">
+                            {(() => {
+                              // 小分類ごとにグループ化
+                              const smallCategoryGroups: Record<string, SkillPhaseItem[]> = {};
+                              phaseItems.forEach((phaseItem) => {
+                                if (!smallCategoryGroups[phaseItem.smallCategory]) {
+                                  smallCategoryGroups[phaseItem.smallCategory] = [];
+                                }
+                                smallCategoryGroups[phaseItem.smallCategory].push(phaseItem);
+                              });
+                              return Object.entries(smallCategoryGroups).map(([smallCategory, items]) =>
+                                items.map((phaseItem) => {
+                                  const hasRelatedMaterials = hasTrainingPermission && linkedItemIds.has(phaseItem.id);
+                                  const isHighlighted = highlightedSkillIds.has(phaseItem.id);
+                                    return (
+                                      <div key={phaseItem.id} className="flex items-center gap-2 group">
+                                        <span className={`flex-1 min-w-0 whitespace-nowrap ${isHighlighted ? 'font-semibold bg-yellow-200 dark:bg-yellow-900/30 rounded' : ''}`}>{smallCategory}: {phaseItem.name}</span>
+                                        {hasRelatedMaterials && (
+                                          <button
+                                            className="skill-material-icon p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors flex-shrink-0"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedSkillPhaseItem(phaseItem);
+                                              setIsRelatedMaterialsModalOpen(true);
+                                            }}
+                                            title="関連資料を表示"
+                                            aria-label="関連資料を表示"
+                                          >
+                                            <BookOpen className="w-3 h-3" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                })
+                              );
+                            })()}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {/* 関連資料表示モーダル */}
+      {selectedSkillPhaseItem && (
+        <SkillRelatedMaterialsModal
+          isOpen={isRelatedMaterialsModalOpen}
+          onClose={() => {
+            setIsRelatedMaterialsModalOpen(false);
+            setSelectedSkillPhaseItem(null);
+          }}
+          skillPhaseItemId={selectedSkillPhaseItem.id}
+          skillPhaseItemName={`${selectedSkillPhaseItem.category} > ${selectedSkillPhaseItem.item} > フェーズ${selectedSkillPhaseItem.phase}`}
+          onMaterialClick={onMaterialClick || (() => {})}
+          readOnly={true}
+          allowUnlink={allowUnlink}
+          onHighlightSkills={onHighlightSkills}
+        />
+      )}
     </div>
   );
 }

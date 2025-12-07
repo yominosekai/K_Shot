@@ -108,3 +108,7 @@ public/help/images/user-manual/README.md
 
 # Cursor調査用ディレクトリ（GitHubには含めない）
 cursor/
+
+# 開発用スクリプト（本番環境では不要、ただしcopy-help-files.tsはビルドに必要なので含める）
+scripts/
+!scripts/copy-help-files.ts

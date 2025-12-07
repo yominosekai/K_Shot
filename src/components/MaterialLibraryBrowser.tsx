@@ -22,6 +22,7 @@ import { useMaterialBrowserHandlers } from './MaterialLibraryBrowser/hooks/useMa
 import { useCategories } from '@/contexts/CategoriesContext';
 import type { MaterialNormalized, FolderNormalized } from '@/features/materials/types';
 import { useAuth } from '@/contexts/AuthContext';
+import SkillMappingSelectionModal from './SkillMappingSelectionModal';
 
 interface MaterialLibraryBrowserProps {
   viewMode: 'grid' | 'list';
@@ -55,6 +56,8 @@ export default function MaterialLibraryBrowser({
   onViewsUpdateRef,
 }: MaterialLibraryBrowserProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: any[] } | null>(null);
+  const [isSkillMappingModalOpen, setIsSkillMappingModalOpen] = useState(false);
+  const [selectedMaterialForSkillMapping, setSelectedMaterialForSkillMapping] = useState<MaterialNormalized | null>(null);
   const { categories } = useCategories(); // Contextから取得
   const { user } = useAuth();
 
@@ -135,6 +138,21 @@ export default function MaterialLibraryBrowser({
     },
   });
 
+  // スキルマップ関連付けの処理
+  const handleLinkToSkillMapping = useCallback((material: MaterialNormalized) => {
+    setSelectedMaterialForSkillMapping(material);
+    setIsSkillMappingModalOpen(true);
+  }, []);
+
+  const handleSkillMappingLinkToggle = useCallback((skillPhaseItemId: number, linked: boolean) => {
+    // 関連付けのトグルが完了したことを通知（必要に応じてリフレッシュなど）
+    if (linked) {
+      toast.showToast('スキルマップに関連付けました');
+    } else {
+      toast.showToast('スキルマップとの関連付けを解除しました');
+    }
+  }, [toast]);
+
   // コンテキストメニュー管理
   const { handleContextMenu: createContextMenu } = useMaterialContextMenu({
     currentPath: currentPath || '',
@@ -152,6 +170,7 @@ export default function MaterialLibraryBrowser({
     onDownloadMaterial: handlers.handleDownloadMaterial,
     onRenameFolder: modals.openRenameModal,
     onMoveFolder: modals.openMoveFolderModal,
+    onLinkToSkillMapping: handleLinkToSkillMapping,
     showToast: toast.showToast,
   });
 
@@ -248,6 +267,20 @@ export default function MaterialLibraryBrowser({
         handleFolderMove={modals.handleFolderMove}
         onViewsUpdateRef={onViewsUpdateRef}
       />
+
+      {/* スキルマップ選択モーダル */}
+      {selectedMaterialForSkillMapping && (
+        <SkillMappingSelectionModal
+          isOpen={isSkillMappingModalOpen}
+          onClose={() => {
+            setIsSkillMappingModalOpen(false);
+            setSelectedMaterialForSkillMapping(null);
+          }}
+          materialId={selectedMaterialForSkillMapping.id}
+          materialTitle={selectedMaterialForSkillMapping.title}
+          onLinkToggle={handleSkillMappingLinkToggle}
+        />
+      )}
 
       {/* トースト通知 */}
       <Toast
