@@ -468,6 +468,14 @@ export default function SkillMappingView({ userId, readOnly = false, onHasChange
           readOnly={readOnly}
           allowUnlink={allowUnlink}
           onHighlightSkills={onHighlightSkills}
+          onUnlink={(skillPhaseItemId) => {
+            // 楽観的更新：linkedItemIdsから該当IDを削除
+            setLinkedItemIds((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(skillPhaseItemId);
+              return newSet;
+            });
+          }}
         />
       )}
     </div>

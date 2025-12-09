@@ -355,6 +355,14 @@ export default function ExcelViewModeTable({ data, onMaterialClick, allowUnlink 
           readOnly={true}
           allowUnlink={allowUnlink}
           onHighlightSkills={onHighlightSkills}
+          onUnlink={(skillPhaseItemId) => {
+            // 楽観的更新：linkedItemIdsから該当IDを削除
+            setLinkedItemIds((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(skillPhaseItemId);
+              return newSet;
+            });
+          }}
         />
       )}
     </div>

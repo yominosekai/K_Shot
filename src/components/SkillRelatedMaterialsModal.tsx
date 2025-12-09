@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { X, FileText, ChevronRight, Highlighter } from 'lucide-react';
 import type { MaterialNormalized } from '@/features/materials/types';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
+import { useConfirmDialog } from '@/contexts/ConfirmDialogContext';
 
 interface SkillRelatedMaterialsModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface SkillRelatedMaterialsModalProps {
   readOnly?: boolean; // 読み取り専用モード（進捗編集の制御）
   allowUnlink?: boolean; // 関連付け解除を許可するか（プロフィールページではfalse、管理ページではtrue）
   onHighlightSkills?: (materialTitle: string) => void; // 関連スキルにハイライトを付けるコールバック
+  onUnlink?: (skillPhaseItemId: number) => void; // 関連付け解除時に親コンポーネントに通知するコールバック
 }
 
 interface RelatedMaterial {
@@ -38,11 +40,13 @@ export default function SkillRelatedMaterialsModal({
   readOnly = false,
   allowUnlink = true, // デフォルトは許可（管理ページ用）
   onHighlightSkills,
+  onUnlink,
 }: SkillRelatedMaterialsModalProps) {
   const [materials, setMaterials] = useState<RelatedMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  const confirmDialog = useConfirmDialog();
 
   // 関連資料を取得
   useEffect(() => {
@@ -77,7 +81,15 @@ export default function SkillRelatedMaterialsModal({
 
   // 関連付けを解除
   const handleUnlink = async (materialId: string) => {
-    if (!confirm('この資料との関連付けを解除しますか？')) {
+    const confirmed = await confirmDialog({
+      title: '関連付けの解除',
+      message: 'この資料との関連付けを解除しますか？',
+      confirmText: '解除',
+      cancelText: 'キャンセル',
+      variant: 'danger',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -100,7 +112,20 @@ export default function SkillRelatedMaterialsModal({
       }
 
       // ローカル状態から削除
-      setMaterials((prev) => prev.filter((m) => m.id !== materialId));
+      setMaterials((prev) => {
+        const updated = prev.filter((m) => m.id !== materialId);
+        // すべての関連付けが解除された場合、親コンポーネントに通知してモーダルを閉じる
+        if (updated.length === 0) {
+          if (onUnlink) {
+            onUnlink(skillPhaseItemId);
+          }
+          // モーダルを自動的に閉じる
+          setTimeout(() => {
+            onClose();
+          }, 100);
+        }
+        return updated;
+      });
     } catch (err) {
       console.error('関連付け解除エラー:', err);
       alert(err instanceof Error ? err.message : '関連付けの解除に失敗しました');
