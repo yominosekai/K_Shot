@@ -144,18 +144,18 @@ $startBat = @"
 @echo off
 echo off
 chcp 65001 >nul 2>&1
-title Knowledge Management Tool (K_Shot) - Server Start
+title ナレッジ管理ツール（K_Shot） - サーバー起動
 cd /d "%~dp0" >nul 2>&1
 
 if not exist "node\node.exe" (
     echo.
-    echo ERROR: node.exe not found
-    echo     Looking for: %CD%\node\node.exe
+    echo ❌ エラー: node.exe が見つかりません
+    echo    探しているパス: %CD%\node\node.exe
     echo.
-    echo Please set up portable Node.js using the following steps:
-    echo 1. Download Node.js from https://nodejs.org/
-    echo 2. Extract using 7-Zip or similar
-    echo 3. Copy files from extracted folder to "node" folder in this directory
+    echo ポータブルNode.jsを以下の手順でセットアップしてください:
+    echo 1. https://nodejs.org/ からNode.jsをダウンロード
+    echo 2. 7-Zipなどで展開
+    echo 3. 展開したフォルダ内のファイルを、このフォルダの "node" フォルダにコピー
     echo.
     pause
     exit /b 1
@@ -166,16 +166,16 @@ cd app >nul 2>&1
 
 if "%PORT%"=="" set PORT=3005
 
-REM Set default log level to ERROR (user can override)
+:: デフォルトのログレベルをERRORに設定（ユーザーが上書き可能）
 if "%LOG_LEVEL%"=="" set LOG_LEVEL=ERROR
 
 echo.
 echo ========================================
-echo   Knowledge Management Tool (K_Shot) - Server Start
+echo   ナレッジ管理ツール（K_Shot） - サーバー起動
 echo ========================================
-echo   Port: %PORT%
+echo   ポート: %PORT%
 echo   URL: http://localhost:%PORT%
-echo   Stop: Ctrl+C
+echo   停止: Ctrl+C
 echo ========================================
 echo.
 

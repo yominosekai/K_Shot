@@ -14,21 +14,23 @@ if not exist ".next" (
     exit /b 1
 )
 
+REM Get current Node.js version from system
+for /f "tokens=*" %%v in ('node --version') do set CURRENT_NODE_VERSION=%%v
+set CURRENT_NODE_VERSION=%CURRENT_NODE_VERSION:v=%
+echo Detected Node.js version: %CURRENT_NODE_VERSION%
+echo.
+
 REM Distribution folder
 set DIST_FOLDER=dist-portable
 set APP_FOLDER=%DIST_FOLDER%\app
 
-REM Remove existing app folder (remove cache first to avoid path length issues)
+REM Remove existing app folder
 if exist "%APP_FOLDER%" (
     echo Removing existing app folder...
-    if exist "%APP_FOLDER%\.next\cache" (
-        echo Removing cache folder first...
-        rmdir /s /q "%APP_FOLDER%\.next\cache" 2>nul
-    )
     rmdir /s /q "%APP_FOLDER%" 2>nul
 )
 
-REM Create folders
+REM Create folder structure
 if not exist "%DIST_FOLDER%" mkdir "%DIST_FOLDER%" 2>nul
 mkdir "%APP_FOLDER%" 2>nul
 if not exist "%DIST_FOLDER%\node" mkdir "%DIST_FOLDER%\node" 2>nul
@@ -38,91 +40,179 @@ echo.
 
 REM Create production node_modules (excluding devDependencies)
 echo Creating production dependencies...
+echo.
+
 set TEMP_PROD_MODULES=%TEMP%\k-shot-prod-modules-%RANDOM%
 
-REM Create temp folder and copy package files
+REM Create temporary folder
 mkdir "%TEMP_PROD_MODULES%" 2>nul
-copy /Y "package.json" "%TEMP_PROD_MODULES%\" >nul
-copy /Y "package-lock.json" "%TEMP_PROD_MODULES%\" >nul 2>nul
 
-REM Install production dependencies
+REM Copy package.json and package-lock.json to temporary folder
+copy /Y "package.json" "%TEMP_PROD_MODULES%\" >nul
+if exist "package-lock.json" copy /Y "package-lock.json" "%TEMP_PROD_MODULES%\" >nul 2>nul
+
+REM Change to temporary folder and run npm install --production
 cd /d "%TEMP_PROD_MODULES%"
 echo Running npm install --production...
 call npm install --production --silent >nul 2>&1
+
+REM Check if node_modules was created
+if not exist "node_modules" (
+    echo WARNING: Production dependencies creation failed. Using development node_modules.
+    cd /d "%~dp0\.."
+    set USE_DEV_MODULES=1
+    goto :copy_files
+)
 
 REM Install TypeScript for next.config.ts
 echo Installing TypeScript for next.config.ts...
 call npm install typescript@^5.7.0 --no-save --silent >nul 2>&1
 
+REM Return to project root
 cd /d "%~dp0\.."
 
-REM Check if production node_modules was created
-if not exist "%TEMP_PROD_MODULES%\node_modules" (
-    echo WARNING: Failed to create production node_modules
-    echo Using development node_modules instead
-    set TEMP_PROD_MODULES=
+REM Check if production modules were created successfully
+if exist "%TEMP_PROD_MODULES%\node_modules" (
+    set USE_DEV_MODULES=0
 ) else (
-    echo Production dependencies created
+    echo WARNING: Production dependencies creation failed. Using development node_modules.
+    set USE_DEV_MODULES=1
 )
 
+:copy_files
 echo.
 echo Copying files...
 echo.
 
-REM Copy .next folder (excluding cache)
-if exist ".next" (
-    echo Copying .next (excluding cache)...
-    mkdir "%APP_FOLDER%\.next" 2>nul
-    for /d %%d in (".next\*") do (
-        if /i not "%%~nxd"=="cache" (
-            echo   - %%~nxd
-            xcopy /E /I /Y "%%d" "%APP_FOLDER%\.next\%%~nxd\" >nul
-        )
-    )
-    for %%f in (".next\*") do (
-        if not exist ".next\%%~nxf\" (
-            copy /Y "%%f" "%APP_FOLDER%\.next\" >nul 2>nul
-        )
-    )
+REM Copy .next folder
+echo   - .next
+xcopy /E /I /Y ".next" "%APP_FOLDER%\.next\" >nul
+REM Remove cache folder if it exists (to avoid path length issues)
+if exist "%APP_FOLDER%\.next\cache" (
+    rmdir /s /q "%APP_FOLDER%\.next\cache" 2>nul
 )
 
-REM Copy node_modules (production version if available)
-if not "%TEMP_PROD_MODULES%"=="" (
-    echo Copying node_modules (production - devDependencies excluded)...
-    xcopy /E /I /Y "%TEMP_PROD_MODULES%\node_modules" "%APP_FOLDER%\node_modules\" >nul
-) else (
-    echo Copying node_modules (development version)...
+REM Copy node_modules (production or development)
+if "%USE_DEV_MODULES%"=="1" (
+    echo   - node_modules (development - devDependencies included)
     xcopy /E /I /Y "node_modules" "%APP_FOLDER%\node_modules\" >nul
+) else (
+    echo   - node_modules (production - devDependencies excluded)
+    xcopy /E /I /Y "%TEMP_PROD_MODULES%\node_modules" "%APP_FOLDER%\node_modules\" >nul
 )
 
 REM Copy public folder
-if exist "public" (
-    echo Copying public...
-    xcopy /E /I /Y "public" "%APP_FOLDER%\public\" >nul
-)
+echo   - public
+xcopy /E /I /Y "public" "%APP_FOLDER%\public\" >nul
 
 REM Copy required files
-if exist "package.json" (
-    echo Copying package.json...
-    copy /Y "package.json" "%APP_FOLDER%\" >nul
-)
-if exist "package-lock.json" (
-    echo Copying package-lock.json...
-    copy /Y "package-lock.json" "%APP_FOLDER%\" >nul 2>nul
-)
-if exist "next.config.ts" (
-    echo Copying next.config.ts...
-    copy /Y "next.config.ts" "%APP_FOLDER%\" >nul
-)
+copy /Y "package.json" "%APP_FOLDER%\" >nul
+if exist "package-lock.json" copy /Y "package-lock.json" "%APP_FOLDER%\" >nul 2>nul
+copy /Y "next.config.ts" "%APP_FOLDER%\" >nul
 
 echo File copy completed
 echo.
 
 REM Clean up temporary production modules folder
-if not "%TEMP_PROD_MODULES%"=="" (
+if exist "%TEMP_PROD_MODULES%" (
     echo Cleaning up temporary files...
     rmdir /s /q "%TEMP_PROD_MODULES%" 2>nul
 )
+
+REM Download and include Node.js (same version as current system)
+set NODE_FOLDER=%DIST_FOLDER%\node
+set NODE_EXE_PATH=%NODE_FOLDER%\node.exe
+set NODE_SETUP_SUCCESS=0
+
+if not exist "%NODE_EXE_PATH%" (
+    echo.
+    echo Downloading portable Node.js v%CURRENT_NODE_VERSION%...
+    echo (This may take a few minutes on first run)
+    echo.
+
+    REM Download Node.js (same version as current system)
+    set NODE_URL=https://nodejs.org/dist/v%CURRENT_NODE_VERSION%/node-v%CURRENT_NODE_VERSION%-win-x64.zip
+    set ZIP_PATH=%TEMP%\node-v%CURRENT_NODE_VERSION%-win-x64.zip
+    set EXTRACT_PATH=%TEMP%\node-v%CURRENT_NODE_VERSION%-win-x64
+
+    REM Check if curl is available
+    where curl >nul 2>&1
+    if errorlevel 1 (
+        echo.
+        echo WARNING: curl command not found
+        echo Node.js download requires curl (available on Windows 10+)
+        echo You can set up Node.js manually (see README.txt)
+        echo.
+        goto :skip_node
+    )
+
+    echo Downloading...
+    curl -L -o "%ZIP_PATH%" "%NODE_URL%" >nul 2>&1
+
+    if not exist "%ZIP_PATH%" (
+        echo.
+        echo WARNING: Node.js download failed
+        echo You can set up Node.js manually (see README.txt)
+        echo.
+        goto :skip_node
+    )
+
+    echo Download completed
+    echo Extracting ZIP file...
+    
+    REM Remove existing extract path
+    if exist "%EXTRACT_PATH%" rmdir /s /q "%EXTRACT_PATH%" 2>nul
+    
+    REM Extract using tar (available on Windows 10+)
+    where tar >nul 2>&1
+    if errorlevel 1 (
+        echo WARNING: tar command not found
+        echo ZIP extraction requires tar (available on Windows 10+)
+        echo You can extract manually or set up Node.js manually (see README.txt)
+        del /F /Q "%ZIP_PATH%" 2>nul
+        goto :skip_node
+    )
+    
+    cd /d "%TEMP%"
+    tar -xf "%ZIP_PATH%" >nul 2>&1
+    cd /d "%~dp0\.."
+    
+    if not exist "%EXTRACT_PATH%" (
+        echo WARNING: ZIP extraction failed
+        del /F /Q "%ZIP_PATH%" 2>nul
+        goto :skip_node
+    )
+
+    echo Copying files...
+    set SOURCE_NODE=%TEMP%\node-v%CURRENT_NODE_VERSION%-win-x64
+    xcopy /E /I /Y "%SOURCE_NODE%\*" "%NODE_FOLDER%\" >nul
+
+    REM Clean up temporary files
+    del /F /Q "%ZIP_PATH%" 2>nul
+    rmdir /s /q "%EXTRACT_PATH%" 2>nul
+
+    REM Verify Node.js
+    if exist "%NODE_EXE_PATH%" (
+        "%NODE_EXE_PATH%" --version >nul 2>&1
+        if errorlevel 1 (
+            echo WARNING: Node.js verification failed
+            goto :skip_node
+        ) else (
+            for /f "delims=" %%v in ('"%NODE_EXE_PATH%" --version') do echo    Version: %%v
+            set NODE_SETUP_SUCCESS=1
+        )
+    ) else (
+        echo ERROR: Node.js copy failed
+        goto :skip_node
+    )
+) else (
+    echo.
+    echo Portable Node.js is already set up
+    set NODE_SETUP_SUCCESS=1
+)
+
+:skip_node
+echo.
 
 REM Create start.bat
 echo Creating start.bat...
@@ -130,7 +220,7 @@ echo Creating start.bat...
 echo @echo off
 echo echo off
 echo chcp 65001 ^>nul 2^>^&1
-echo title Knowledge Management Tool ^(K_Shot^) - Server Start
+echo title K_Shot - Server Start
 echo cd /d "%%~dp0" ^>nul 2^>^&1
 echo.
 echo if not exist "node\node.exe" ^(
@@ -138,9 +228,9 @@ echo     echo.
 echo     echo ERROR: node.exe not found
 echo     echo     Looking for: %%CD%%\node\node.exe
 echo     echo.
-echo     echo Please set up portable Node.js using the following steps:
+echo     echo Please set up portable Node.js:
 echo     echo 1. Download Node.js from https://nodejs.org/
-echo     echo 2. Extract using 7-Zip or similar
+echo     echo 2. Extract with 7-Zip
 echo     echo 3. Copy files from extracted folder to "node" folder in this directory
 echo     echo.
 echo     pause
@@ -157,7 +247,7 @@ echo if "%%LOG_LEVEL%%"=="" set LOG_LEVEL=ERROR
 echo.
 echo echo.
 echo echo ========================================
-echo echo   Knowledge Management Tool ^(K_Shot^) - Server Start
+echo echo   K_Shot - Server Start
 echo echo ========================================
 echo echo   Port: %%PORT%%
 echo echo   URL: http://localhost:%%PORT%%
@@ -170,7 +260,7 @@ echo.
 echo pause
 ) > "%DIST_FOLDER%\start.bat"
 
-echo start.bat created
+echo Start script created
 echo.
 
 REM Create README.txt (only if it doesn't exist)
@@ -179,18 +269,18 @@ if not exist "%README_PATH%" (
     echo Creating README.txt...
     (
         echo ========================================
-        echo Knowledge Management Tool ^(K_Shot^) - Portable Version
+        echo K_Shot - Portable Distribution Package
         echo ========================================
         echo.
         echo [Setup Instructions]
         echo.
         echo 1. Portable Node.js Setup
         echo.
-        echo    Use one of the following methods:
+        echo    Choose one of the following methods:
         echo.
         echo    [Method A] Use Portable Node.js ^(Recommended^)
         echo    - Download Node.js LTS from https://nodejs.org/
-        echo    - Extract ZIP file using 7-Zip or similar
+        echo    - Extract ZIP file with 7-Zip
         echo    - Copy files from extracted folder to "node" folder in this directory
         echo    - Verify that node.exe exists at node\node.exe
         echo.
@@ -211,9 +301,9 @@ if not exist "%README_PATH%" (
         echo     set PORT=3000
         echo     start.bat
         echo.
-        echo Or edit start.bat to change the PORT value.
+        echo Or edit start.bat and change the PORT value.
         echo.
-        echo [Set Log Level]
+        echo [Log Level Settings]
         echo.
         echo You can change the log level by setting the LOG_LEVEL environment variable:
         echo.
@@ -234,17 +324,17 @@ if not exist "%README_PATH%" (
         echo [Troubleshooting]
         echo.
         echo 1. Server won't start
-        echo    - Verify node\node.exe exists
+        echo    - Check if node\node.exe exists
         echo    - Check if port is not used by another application
         echo    - Check firewall settings
         echo.
-        echo 2. Database errors occur
-        echo    - Verify network drive is properly mounted
+        echo 2. Database errors
+        echo    - Check if network drive is properly mounted
         echo    - Check initial setup configuration
         echo.
         echo [Support]
         echo.
-        echo For detailed documentation, refer to the project's README.md
+        echo For detailed documentation, see the project README.md
     ) > "%README_PATH%"
     echo README.txt created
 ) else (
@@ -252,85 +342,22 @@ if not exist "%README_PATH%" (
 )
 echo.
 
-REM Setup portable Node.js
-set NODE_FOLDER=%DIST_FOLDER%\node
-set NODE_EXE_PATH=%NODE_FOLDER%\node.exe
-set NODE_SETUP_SUCCESS=0
-
-if not exist "%NODE_EXE_PATH%" (
-    echo.
-    echo Setting up portable Node.js automatically...
-    
-    REM Get current Node.js version
-    for /f "tokens=*" %%v in ('node --version 2^>nul') do set CURRENT_NODE_VERSION=%%v
-    set CURRENT_NODE_VERSION=%CURRENT_NODE_VERSION:v=%
-    
-    if not "%CURRENT_NODE_VERSION%"=="" (
-        echo Detected Node.js version: %CURRENT_NODE_VERSION%
-        
-        set NODE_ZIP_URL=https://nodejs.org/dist/v%CURRENT_NODE_VERSION%/node-v%CURRENT_NODE_VERSION%-win-x64.zip
-        set TEMP_ZIP_PATH=%TEMP%\node-v%CURRENT_NODE_VERSION%-win-x64.zip
-        set EXTRACTED_NODE_FOLDER=%TEMP%\node-v%CURRENT_NODE_VERSION%-win-x64
-        
-        echo Downloading...
-        powershell -ExecutionPolicy Bypass -Command "& { $ProgressPreference = 'SilentlyContinue'; try { Invoke-WebRequest -Uri '%NODE_ZIP_URL%' -OutFile '%TEMP_ZIP_PATH%' -UseBasicParsing; Write-Host 'Download completed' } catch { Write-Host 'Download error: ' $_.Exception.Message; exit 1 } }"
-        
-        if not errorlevel 1 (
-            echo Extracting...
-            powershell -ExecutionPolicy Bypass -Command "& { if (Test-Path '%EXTRACTED_NODE_FOLDER%') { Remove-Item -Recurse -Force '%EXTRACTED_NODE_FOLDER%' }; Expand-Archive -Path '%TEMP_ZIP_PATH%' -DestinationPath '%TEMP%' -Force }"
-            
-            echo Copying files...
-            if exist "%EXTRACTED_NODE_FOLDER%" (
-                xcopy /E /I /Y "%EXTRACTED_NODE_FOLDER%\*" "%NODE_FOLDER%\" >nul
-                
-                if exist "%NODE_EXE_PATH%" (
-                    set NODE_SETUP_SUCCESS=1
-                    echo Portable Node.js setup completed
-                ) else (
-                    echo ERROR: Failed to copy Node.js
-                )
-            ) else (
-                echo ERROR: Extracted folder not found
-            )
-            
-            REM Clean up temporary files
-            del /F /Q "%TEMP_ZIP_PATH%" 2>nul
-            rmdir /s /q "%EXTRACTED_NODE_FOLDER%" 2>nul
-        ) else (
-            echo ERROR: Node.js download failed
-        )
-    ) else (
-        echo ERROR: Failed to get Node.js version
-    )
-) else (
-    set NODE_SETUP_SUCCESS=1
-    echo.
-    echo Portable Node.js is already set up
-)
-
-REM Calculate and display package size
-echo.
+REM Check size
 echo Package Information:
-for /f "tokens=3" %%a in ('dir /s /-c "%APP_FOLDER%" 2^>nul ^| find "File(s)"') do set APP_SIZE=%%a
 echo    Application folder: %APP_FOLDER%
-
-if exist "%NODE_FOLDER%\node.exe" (
-    for /f "tokens=3" %%a in ('dir /s /-c "%NODE_FOLDER%" 2^>nul ^| find "File(s)"') do set NODE_SIZE=%%a
-    echo    Node.js: Included
+if "%NODE_SETUP_SUCCESS%"=="1" (
+    echo    Node.js: Included ^(v%CURRENT_NODE_VERSION%^)
 ) else (
-    echo    Node.js: Not included ^(can be set up manually^)
+    echo    Node.js: Not included ^(see README.txt for setup instructions^)
 )
-
-echo    Distribution folder: %DIST_FOLDER%
 echo.
 echo Portable distribution package creation completed!
 echo.
 echo Next steps:
 if "%NODE_SETUP_SUCCESS%"=="1" (
-    echo Run dist-portable\start.bat to start the server
+    echo 1. Run dist-portable\start.bat to start the server
 ) else (
-    echo 1. Manually place portable Node.js in the "node" folder
-    echo    ^(See README.txt for instructions^)
+    echo 1. Set up Node.js in the "node" folder ^(see README.txt^)
     echo 2. Run dist-portable\start.bat to start the server
 )
 echo.

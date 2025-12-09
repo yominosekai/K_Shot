@@ -1,7 +1,7 @@
 ﻿@echo off
 echo off
 chcp 65001 >nul 2>&1
-title Knowledge Management Tool (K_Shot) - Server Start
+title K_Shot - Server Start
 cd /d "%~dp0" >nul 2>&1
 
 if not exist "node\node.exe" (
@@ -9,9 +9,9 @@ if not exist "node\node.exe" (
     echo ERROR: node.exe not found
     echo     Looking for: %CD%\node\node.exe
     echo.
-    echo Please set up portable Node.js using the following steps:
+    echo Please set up portable Node.js:
     echo 1. Download Node.js from https://nodejs.org/
-    echo 2. Extract using 7-Zip or similar
+    echo 2. Extract with 7-Zip
     echo 3. Copy files from extracted folder to "node" folder in this directory
     echo.
     pause
@@ -28,7 +28,7 @@ if "%LOG_LEVEL%"=="" set LOG_LEVEL=ERROR
 
 echo.
 echo ========================================
-echo   Knowledge Management Tool (K_Shot) - Server Start
+echo   K_Shot - Server Start
 echo ========================================
 echo   Port: %PORT%
 echo   URL: http://localhost:%PORT%
